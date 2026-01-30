@@ -1,7 +1,5 @@
 {
   "name": "Agenda Aquarela",
   "description": "Uma agenda escolar digital moderna e colorida para conectar gestores, professores e responsáveis, facilitando o acompanhamento da rotina pedagógica.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "requestFramePermissions": []
 }
