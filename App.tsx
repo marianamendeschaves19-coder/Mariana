@@ -117,8 +117,8 @@ const App: React.FC = () => {
 
   if (viewState === 'SIGNUP') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 gradient-aquarela font-['Quicksand']">
-        <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+        <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl border border-orange-100">
           <button onClick={() => setViewState('LOGIN')} className="text-gray-900 font-bold text-xs mb-6 block">← VOLTAR</button>
           <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
           <form onSubmit={handleSignup} className="space-y-4">
@@ -126,7 +126,7 @@ const App: React.FC = () => {
             <input required type="email" placeholder="E-mail" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
             <input required type="text" placeholder="Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
             <input required type="password" placeholder="Sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
-            <button type="submit" className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl uppercase tracking-widest text-sm shadow-xl">CADASTRAR</button>
+            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase tracking-widest text-sm shadow-xl hover:scale-[1.02] transition-transform">CADASTRAR</button>
           </form>
         </div>
       </div>
@@ -135,13 +135,30 @@ const App: React.FC = () => {
 
   if (viewState === 'LOGIN') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 gradient-aquarela font-['Quicksand']">
-        <div className="bg-white rounded-[2rem] p-10 w-full max-w-md shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+        <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-inner rotate-3">🎨</div>
-            <h1 className="text-3xl font-black text-gray-900">Agenda Aquarela</h1>
+            {/* Logo da Escola Aquarela */}
+            <img 
+              src="https://raw.githubusercontent.com/StackBlitz/stackblitz-images/main/aquarela-logo.png" 
+              alt="Creche Escola Aquarela" 
+              className="w-44 h-auto mx-auto mb-2 drop-shadow-xl"
+              onError={(e) => {
+                // Fallback para caso a URL não carregue, mantendo o estilo original
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if(parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3";
+                  fallback.innerHTML = "🎨";
+                  parent.insertBefore(fallback, parent.firstChild);
+                }
+              }}
+            />
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Agenda Aquarela</h1>
+            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Onde o aprendizado ganha cores</p>
           </div>
-          <div className="flex bg-gray-100 p-1 rounded-2xl mb-8">
+          <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-8">
             {[UserRole.GUARDIAN, UserRole.TEACHER, UserRole.MANAGER].map(role => (
               <button key={role} onClick={() => setLoginRole(role)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${loginRole === role ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
                 {role === UserRole.GUARDIAN ? 'Família' : role === UserRole.TEACHER ? 'Professor' : 'Gestor'}
@@ -149,11 +166,11 @@ const App: React.FC = () => {
             ))}
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
-            {loginRole === UserRole.MANAGER && <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />}
-            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm">ENTRAR</button>
+            <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
+            {loginRole === UserRole.MANAGER && <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />}
+            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02] active:scale-[0.98]">ENTRAR</button>
           </form>
-          {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-xs font-black text-gray-900 uppercase tracking-widest hover:underline">Novo Gestor?</button>}
+          {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre o Gestor</button>}
         </div>
       </div>
     );
