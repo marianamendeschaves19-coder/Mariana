@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Class, Student, RoutineEntry, LessonPlan, FeedPost, ChatMessage, ChatConfig, User, UserRole } from '../types';
 import CreatePostForm from './CreatePostForm';
@@ -44,7 +43,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Routine Form State
   const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>(INITIAL_ROUTINE);
 
-  // Fix: Added missing state for the lesson planning form
+  // Lesson planning form state
   const [planData, setPlanData] = useState({
     date: new Date().toISOString().split('T')[0],
     lessonNumber: '',
@@ -88,7 +87,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     alert(`Rotina de ${selectedStudent.name} salva com sucesso!`);
   };
 
-  // Fix: handlePlanSubmit now correctly uses the planData state
   const handlePlanSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!planData.classId || !planData.objective || !planData.content) {
@@ -111,8 +109,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setRoutineData(prev => ({ ...prev, observations: summary }));
     setIsGenerating(false);
   };
-
-  const myStudents = students.filter(s => classes.some(c => c.id === s.classId));
 
   const isRoutineSaved = (studentId: string) => {
     return routines.some(r => r.studentId === studentId && r.date === routineData.date);
@@ -147,27 +143,42 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       ) : activeView === 'routines' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="bg-white p-6 rounded-[2rem] card-shadow space-y-4">
-            <h3 className="font-black text-gray-800 text-sm uppercase tracking-widest mb-4 flex items-center gap-2"><span>👶</span> Meus Alunos</h3>
-            <div className="space-y-2 overflow-y-auto max-h-[600px] pr-2 scrollbar-hide">
-              {myStudents.map(student => {
-                const saved = isRoutineSaved(student.id);
-                return (
-                  <button 
-                    key={student.id} 
-                    onClick={() => setSelectedStudent(student)}
-                    className={`w-full p-4 rounded-2xl border transition-all text-left flex items-center justify-between group ${selectedStudent?.id === student.id ? 'border-orange-500 bg-orange-50' : 'border-gray-50 hover:border-orange-200'}`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className={`font-bold text-sm ${selectedStudent?.id === student.id ? 'text-orange-600' : 'text-gray-700'}`}>{student.name}</p>
-                        {saved && <span className="bg-green-100 text-green-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">SALVO</span>}
-                      </div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{classes.find(c => c.id === student.classId)?.name}</p>
+            <h3 className="font-black text-gray-800 text-sm uppercase tracking-widest mb-4 flex items-center gap-2"><span>🏫</span> Minhas Turmas</h3>
+            <div className="space-y-6 overflow-y-auto max-h-[600px] pr-2 scrollbar-hide">
+              {classes.length === 0 ? (
+                <p className="text-[10px] text-gray-400 italic text-center py-4">Nenhuma turma vinculada.</p>
+              ) : (
+                classes.map(cls => (
+                  <div key={cls.id} className="space-y-2">
+                    <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1 bg-orange-50 px-3 py-1 rounded-full w-fit">
+                      {cls.name}
+                    </h4>
+                    <div className="space-y-1 pl-1">
+                      {students.filter(s => s.classId === cls.id).map(student => {
+                        const saved = isRoutineSaved(student.id);
+                        return (
+                          <button 
+                            key={student.id} 
+                            onClick={() => setSelectedStudent(student)}
+                            className={`w-full p-3 rounded-2xl border transition-all text-left flex items-center justify-between group ${selectedStudent?.id === student.id ? 'border-orange-500 bg-orange-50' : 'border-gray-50 hover:border-orange-200'}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={`font-bold text-xs truncate ${selectedStudent?.id === student.id ? 'text-orange-600' : 'text-gray-700'}`}>{student.name}</p>
+                                {saved && <span className="bg-green-100 text-green-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shrink-0">SALVO</span>}
+                              </div>
+                            </div>
+                            <span className="text-lg shrink-0 ml-2">{selectedStudent?.id === student.id ? '✏️' : '👤'}</span>
+                          </button>
+                        );
+                      })}
+                      {students.filter(s => s.classId === cls.id).length === 0 && (
+                        <p className="text-[9px] text-gray-300 italic pl-2">Nenhum aluno nesta turma.</p>
+                      )}
                     </div>
-                    <span className="text-xl">{selectedStudent?.id === student.id ? '✏️' : '👤'}</span>
-                  </button>
-                );
-              })}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -300,7 +311,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-white rounded-[2rem] card-shadow border-2 border-dashed border-gray-100 p-12 text-center">
                 <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6 text-4xl shadow-inner">🗒️</div>
                 <h4 className="text-xl font-black text-gray-700 mb-2">Selecione um Aluno</h4>
-                <p className="text-sm text-gray-400 font-medium">Escolha uma criança na lista ao lado para preencher ou editar o diário.</p>
+                <p className="text-sm text-gray-400 font-medium">Escolha uma criança na lista ao lado (agrupada por turma) para preencher o diário.</p>
               </div>
             )}
           </div>
@@ -318,7 +329,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="space-y-4">
                    <div><label className="text-[9px] font-black text-orange-400 uppercase ml-1">Materiais</label><textarea value={planData.materials} onChange={e => setPlanData({...planData, materials: e.target.value})} placeholder="Lista de materiais..." className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-gray-100 outline-none focus:ring-2 focus:ring-orange-200 min-h-[80px] resize-none" /></div>
                    <div><label className="text-[9px] font-black text-orange-400 uppercase ml-1">Objetivo</label><textarea value={planData.objective} onChange={e => setPlanData({...planData, objective: e.target.value})} placeholder="Objetivo pedagógico..." className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-gray-100 outline-none focus:ring-2 focus:ring-orange-200 min-h-[80px] resize-none" /></div>
-                   <div><label className="text-[9px] font-black text-orange-400 uppercase ml-1">Conteúdo</label><textarea value={planData.content} onChange={e => setPlanData({...planData, content: e.target.value})} placeholder="Metodologia e desenvolvimento..." className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-gray-100 outline-none focus:ring-2 focus:ring-orange-200 min-h-[120px] resize-none" /></div>
+                   <div><label className="text-[9px] font-black text-orange-400 uppercase ml-1">Conteúdo</label><textarea value={planData.content} onChange={e => setPlanData({...planData, content: e.target.value})} placeholder="Metodologia e desenvolvimento..." className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-transparent outline-none focus:ring-2 focus:ring-orange-200 min-h-[120px] resize-none" /></div>
                    <div><label className="text-[9px] font-black text-orange-400 uppercase ml-1">Avaliação</label><textarea value={planData.assessment} onChange={e => setPlanData({...planData, assessment: e.target.value})} placeholder="Critérios de avaliação..." className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-gray-100 outline-none focus:ring-2 focus:ring-orange-200 min-h-[80px] resize-none" /></div>
                 </div>
                 <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm hover:scale-[1.01] transition-all">SALVAR PLANEJAMENTO</button>

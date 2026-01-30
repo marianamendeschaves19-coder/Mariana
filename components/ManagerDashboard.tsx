@@ -316,16 +316,53 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   </div>
                   <button onClick={() => {if(className){onAddClass(className, classTeacherId); setClassName(''); setClassTeacherId(''); alert("Turma criada!");}}} className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">CRIAR TURMA</button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {classes.map(c => (
-                    <div key={c.id} className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 flex justify-between items-center group">
-                      <div>
-                        <p className="font-black text-gray-900">{c.name}</p>
-                        <p className="text-[10px] text-orange-500 font-black uppercase">Prof: {users.find(u => u.id === c.teacherId)?.name || 'Sem vínculo'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {classes.map(c => {
+                    const classStudents = students.filter(s => s.classId === c.id);
+                    return (
+                      <div key={c.id} className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 flex flex-col group transition-all hover:border-orange-200">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <p className="font-black text-gray-900 text-lg">{c.name}</p>
+                            <p className="text-[10px] text-orange-500 font-black uppercase">Prof: {users.find(u => u.id === c.teacherId)?.name || 'Sem vínculo'}</p>
+                          </div>
+                          <button onClick={() => onDeleteClass(c.id)} className="text-gray-200 hover:text-red-500 p-2 transition-colors" title="Excluir Turma">✕</button>
+                        </div>
+
+                        {/* Lista de Alunos na Turma */}
+                        <div className="mt-2 pt-4 border-t border-orange-50">
+                          <div className="flex justify-between items-center mb-3">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Alunos ({classStudents.length})</p>
+                          </div>
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-hide">
+                            {classStudents.length > 0 ? (
+                              classStudents.map(student => (
+                                <div key={student.id} className="flex justify-between items-center bg-gray-50/50 px-3 py-2 rounded-xl group/student hover:bg-orange-50 transition-colors">
+                                  <span className="text-xs font-bold text-gray-700">{student.name}</span>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if(confirm(`Tem certeza que deseja excluir ${student.name} desta turma?`)) {
+                                        onDeleteStudent(student.id);
+                                      }
+                                    }} 
+                                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                    title="Remover Aluno"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-[10px] text-gray-400 italic py-2">Nenhum aluno matriculado nesta turma.</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <button onClick={() => onDeleteClass(c.id)} className="text-gray-200 hover:text-red-500 p-2">✕</button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
           ) : activeTab === 'events' ? (
