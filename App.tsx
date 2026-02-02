@@ -6,11 +6,13 @@ import Layout from './components/Layout';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import GuardianDashboard from './components/GuardianDashboard';
+import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>('LOGIN');
   const [loginRole, setLoginRole] = useState<UserRole>(UserRole.GUARDIAN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [classes, setClasses] = useState<Class[]>(INITIAL_CLASSES);
@@ -31,39 +33,69 @@ const App: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  useEffect(() => {
-    const sR = localStorage.getItem('a_routines');
-    const sU = localStorage.getItem('a_users');
-    const sC = localStorage.getItem('a_classes');
-    const sS = localStorage.getItem('a_students');
-    const sP = localStorage.getItem('a_posts');
-    const sE = localStorage.getItem('a_events');
-    const sM = localStorage.getItem('a_menus');
-    const sMsg = localStorage.getItem('a_messages');
+  // Busca inicial de dados do Supabase
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [
+        { data: dbUsers },
+        { data: dbClasses },
+        { data: dbStudents },
+        { data: dbRoutines },
+        { data: dbPlans },
+        { data: dbPosts },
+        { data: dbEvents },
+        { data: dbMenus },
+        { data: dbMessages }
+      ] = await Promise.all([
+        supabase.from('users').select('*'),
+        supabase.from('classes').select('*'),
+        supabase.from('students').select('*'),
+        supabase.from('routines').select('*'),
+        supabase.from('lesson_plans').select('*'),
+        supabase.from('posts').select('*').order('createdAt', { ascending: false }),
+        supabase.from('events').select('*'),
+        supabase.from('menus').select('*'),
+        supabase.from('messages').select('*')
+      ]);
 
-    if (sR) setRoutines(JSON.parse(sR));
-    if (sU) setUsers(JSON.parse(sU));
-    if (sC) setClasses(JSON.parse(sC));
-    if (sS) setStudents(JSON.parse(sS));
-    if (sP) setPosts(JSON.parse(sP));
-    if (sE) setEvents(JSON.parse(sE));
-    if (sM) setMenus(JSON.parse(sM));
-    if (sMsg) setMessages(JSON.parse(sMsg));
+      if (dbUsers) setUsers(dbUsers);
+      if (dbClasses) setClasses(dbClasses);
+      if (dbStudents) setStudents(dbStudents);
+      if (dbRoutines) setRoutines(dbRoutines);
+      // Fix: Cast dbPlans to LessonPlan[] to satisfy status union type
+      if (dbPlans) setLessonPlans(dbPlans as LessonPlan[]);
+      if (dbPosts) setPosts(dbPosts);
+      if (dbEvents) setEvents(dbEvents);
+      if (dbMenus) setMenus(dbMenus);
+      if (dbMessages) setMessages(dbMessages);
+    } catch (error) {
+      console.error("Erro ao carregar dados do Supabase:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  useEffect(() => { localStorage.setItem('a_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('a_classes', JSON.stringify(classes)); }, [classes]);
-  useEffect(() => { localStorage.setItem('a_students', JSON.stringify(students)); }, [students]);
-  useEffect(() => { localStorage.setItem('a_routines', JSON.stringify(routines)); }, [routines]);
-  useEffect(() => { localStorage.setItem('a_posts', JSON.stringify(posts)); }, [posts]);
-  useEffect(() => { localStorage.setItem('a_events', JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem('a_menus', JSON.stringify(menus)); }, [menus]);
-  useEffect(() => { localStorage.setItem('a_messages', JSON.stringify(messages)); }, [messages]);
-
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (users.some(u => u.email.toLowerCase() === signupEmail.toLowerCase())) return alert("E-mail já cadastrado.");
-    const newUser: User = { id: `u-${Date.now()}`, name: signupName, email: signupEmail, function: signupFunction, password: signupPassword, role: UserRole.MANAGER };
+    
+    const newUser: User = { 
+      id: `u-${Date.now()}`, 
+      name: signupName, 
+      email: signupEmail, 
+      function: signupFunction, 
+      password: signupPassword, 
+      role: UserRole.MANAGER 
+    };
+
+    const { error } = await supabase.from('users').insert([newUser]);
+    if (error) return alert("Erro ao cadastrar no banco de dados.");
+
     setUsers(prev => [...prev, newUser]);
     alert("Escola cadastrada com sucesso!");
     setViewState('LOGIN');
@@ -86,34 +118,86 @@ const App: React.FC = () => {
     setLoginPassword('');
   };
 
-  const handleAddStudent = (studentName: string, classId: string, guardianEmailsStr: string) => {
+  const handleAddStudent = async (studentName: string, classId: string, guardianEmailsStr: string) => {
     const emails = guardianEmailsStr.split(/[,;\n]/).map(e => e.trim().toLowerCase()).filter(e => e !== "");
     const gIds: string[] = [];
     const newU: User[] = [];
+    
     emails.forEach(email => {
       let ex = users.find(u => u.email.toLowerCase() === email);
-      if (ex) { gIds.push(ex.id); } 
-      else {
+      if (ex) { 
+        gIds.push(ex.id); 
+      } else {
         const id = `u-${Math.random().toString(36).substr(2, 9)}`;
         newU.push({ id, name: `Resp. de ${studentName}`, email, role: UserRole.GUARDIAN });
         gIds.push(id);
       }
     });
-    if (newU.length > 0) setUsers(prev => [...prev, ...newU]);
-    setStudents(prev => [...prev, { id: `s-${Date.now()}`, name: studentName, classId, guardianIds: gIds }]);
+
+    if (newU.length > 0) {
+      await supabase.from('users').insert(newU);
+      setUsers(prev => [...prev, ...newU]);
+    }
+
+    const newStudent: Student = { id: `s-${Date.now()}`, name: studentName, classId, guardianIds: gIds };
+    await supabase.from('students').insert([newStudent]);
+    setStudents(prev => [...prev, newStudent]);
   };
 
-  const handleSaveRoutine = (nr: Omit<RoutineEntry, 'id'>) => {
+  const handleSaveRoutine = async (nr: Omit<RoutineEntry, 'id'>) => {
+    const existing = routines.find(r => r.studentId === nr.studentId && r.date === nr.date);
+    const id = existing ? existing.id : `r-${Date.now()}`;
+    const entry = { ...nr, id };
+
+    const { error } = await supabase.from('routines').upsert([entry]);
+    if (error) return alert("Erro ao salvar rotina.");
+
     setRoutines(prev => {
-      const existingIndex = prev.findIndex(r => r.studentId === nr.studentId && r.date === nr.date);
-      if (existingIndex >= 0) {
+      const idx = prev.findIndex(r => r.studentId === nr.studentId && r.date === nr.date);
+      if (idx >= 0) {
         const updated = [...prev];
-        updated[existingIndex] = { ...prev[existingIndex], ...nr };
+        updated[idx] = entry;
         return updated;
       }
-      return [...prev, { ...nr, id: `r-${Date.now()}` }];
+      return [...prev, entry];
     });
   };
+
+  const handleAddClass = async (name: string, teacherId: string) => {
+    const newClass: Class = { id: `c-${Date.now()}`, name, teacherId };
+    await supabase.from('classes').insert([newClass]);
+    setClasses(prev => [...prev, newClass]);
+  };
+
+  const handleDeleteClass = async (id: string) => {
+    await supabase.from('classes').delete().eq('id', id);
+    setClasses(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    await supabase.from('students').delete().eq('id', id);
+    setStudents(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleAddEvent = async (e: Omit<SchoolEvent, 'id'>) => {
+    const newEvent = { ...e, id: `e-${Date.now()}` };
+    await supabase.from('events').insert([newEvent]);
+    setEvents(prev => [...prev, newEvent]);
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    await supabase.from('events').delete().eq('id', id);
+    setEvents(prev => prev.filter(e => e.id !== id));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50 font-['Quicksand']">
+        <div className="w-16 h-16 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-orange-600 font-black uppercase tracking-widest text-xs">Carregando Aquarela...</p>
+      </div>
+    );
+  }
 
   if (viewState === 'SIGNUP') {
     return (
@@ -122,10 +206,10 @@ const App: React.FC = () => {
           <button onClick={() => setViewState('LOGIN')} className="text-gray-900 font-bold text-xs mb-6 block">← VOLTAR</button>
           <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
           <form onSubmit={handleSignup} className="space-y-4">
-            <input required type="text" placeholder="Seu Nome" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
-            <input required type="email" placeholder="E-mail" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
-            <input required type="text" placeholder="Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
-            <input required type="password" placeholder="Sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black" />
+            <input required type="text" placeholder="Seu Nome" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+            <input required type="email" placeholder="E-mail" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+            <input required type="text" placeholder="Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+            <input required type="password" placeholder="Sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
             <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase tracking-widest text-sm shadow-xl hover:scale-[1.02] transition-transform">CADASTRAR</button>
           </form>
         </div>
@@ -138,23 +222,7 @@ const App: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
         <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
           <div className="text-center mb-8">
-            {/* Logo da Escola Aquarela */}
-            <img 
-              src="https://raw.githubusercontent.com/StackBlitz/stackblitz-images/main/aquarela-logo.png" 
-              alt="Creche Escola Aquarela" 
-              className="w-44 h-auto mx-auto mb-2 drop-shadow-xl"
-              onError={(e) => {
-                // Fallback para caso a URL não carregue, mantendo o estilo original
-                e.currentTarget.style.display = 'none';
-                const parent = e.currentTarget.parentElement;
-                if(parent) {
-                  const fallback = document.createElement('div');
-                  fallback.className = "w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3";
-                  fallback.innerHTML = "🎨";
-                  parent.insertBefore(fallback, parent.firstChild);
-                }
-              }}
-            />
+            <div className="w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3">🎨</div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tight">Agenda Aquarela</h1>
             <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Onde o aprendizado ganha cores</p>
           </div>
@@ -185,17 +253,53 @@ const App: React.FC = () => {
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
           routines={routines} onSaveRoutine={handleSaveRoutine}
-          onAddClass={(n, tid) => setClasses(p => [...p, {id: `c-${Date.now()}`, name: n, teacherId: tid}])} 
-          onAddStudent={handleAddStudent} onAddUser={(n, e, r, p) => setUsers(prev => [...prev, {id: `u-${Date.now()}`, name: n, email: e, role: r, password: p}])}
-          onUpdateClassTeacher={(cid, tid) => setClasses(p => p.map(c => c.id === cid ? {...c, teacherId: tid} : c))}
-          onApprovePlan={(pid) => setLessonPlans(p => p.map(x => x.id === pid ? {...x, status: 'approved'} : x))}
-          onCreatePost={(p) => setPosts(prev => [{...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()}, ...prev])} 
-          onLikePost={(pid) => setPosts(p => p.map(x => x.id === pid ? {...x, likes: x.likes.includes(currentUser.id) ? x.likes.filter(id => id !== currentUser.id) : [...x.likes, currentUser.id]} : x))} 
-          onSendMessage={(c, r) => setMessages(p => [...p, {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()}])}
-          onUpdateChatConfig={setChatConfig} onDeleteClass={id => setClasses(p => p.filter(c => c.id !== id))}
-          onDeleteStudent={id => setStudents(p => p.filter(s => s.id !== id))} onDeleteUser={id => setUsers(p => p.filter(u => u.id !== id))}
-          onAddEvent={e => setEvents(p => [...p, {...e, id: `e-${Date.now()}`}])} onDeleteEvent={id => setEvents(p => p.filter(e => e.id !== id))}
-          onAddMenu={m => setMenus(p => [...p.filter(x => x.date !== m.date), {...m, id: `m-${Date.now()}`}])}
+          onAddClass={handleAddClass} 
+          onAddStudent={handleAddStudent} 
+          onAddUser={async (n, e, r, p) => {
+            const newUser = {id: `u-${Date.now()}`, name: n, email: e, role: r, password: p};
+            await supabase.from('users').insert([newUser]);
+            setUsers(prev => [...prev, newUser]);
+          }}
+          onUpdateClassTeacher={async (cid, tid) => {
+            await supabase.from('classes').update({ teacherId: tid }).eq('id', cid);
+            setClasses(p => p.map(c => c.id === cid ? {...c, teacherId: tid} : c));
+          }}
+          onApprovePlan={async (pid) => {
+            await supabase.from('lesson_plans').update({ status: 'approved' }).eq('id', pid);
+            // Fix: Explicitly cast the mapped object to LessonPlan to ensure 'status' literal compatibility
+            setLessonPlans(p => p.map(x => x.id === pid ? ({ ...x, status: 'approved' } as LessonPlan) : x));
+          }}
+          onCreatePost={async (p) => {
+            const newPost = {...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()};
+            await supabase.from('posts').insert([newPost]);
+            setPosts(prev => [newPost, ...prev]);
+          }} 
+          onLikePost={async (pid) => {
+            const post = posts.find(x => x.id === pid);
+            if (!post) return;
+            const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
+            await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
+            setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
+          }} 
+          onSendMessage={async (c, r) => {
+            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
+            await supabase.from('messages').insert([newMsg]);
+            setMessages(p => [...p, newMsg]);
+          }}
+          onUpdateChatConfig={setChatConfig} 
+          onDeleteClass={handleDeleteClass}
+          onDeleteStudent={handleDeleteStudent} 
+          onDeleteUser={async id => {
+            await supabase.from('users').delete().eq('id', id);
+            setUsers(p => p.filter(u => u.id !== id));
+          }}
+          onAddEvent={handleAddEvent} 
+          onDeleteEvent={handleDeleteEvent}
+          onAddMenu={async m => {
+            const newMenu = {...m, id: `m-${Date.now()}`};
+            await supabase.from('menus').upsert([newMenu]);
+            setMenus(p => [...p.filter(x => x.date !== m.date), newMenu]);
+          }}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
@@ -203,18 +307,47 @@ const App: React.FC = () => {
           classes={classes.filter(c => c.teacherId === currentUser.id)} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
-          onSaveLessonPlan={pd => setLessonPlans(p => [...p, {...pd, id: `p-${Date.now()}`, teacherId: currentUser.id, status: 'pending', createdAt: new Date().toISOString()}])}
-          onCreatePost={p => setPosts(prev => [{...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()}, ...prev])} 
-          onLikePost={pid => setPosts(p => p.map(x => x.id === pid ? {...x, likes: x.likes.includes(currentUser.id) ? x.likes.filter(id => id !== currentUser.id) : [...x.likes, currentUser.id]} : x))} 
-          onSendMessage={(c, r) => setMessages(p => [...p, {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()}])}
+          onSaveLessonPlan={async pd => {
+            // Fix: Explicitly type newPlan as LessonPlan to avoid 'status' widening to string
+            const newPlan: LessonPlan = { ...pd, id: `p-${Date.now()}`, teacherId: currentUser.id, status: 'pending', createdAt: new Date().toISOString() };
+            await supabase.from('lesson_plans').insert([newPlan]);
+            setLessonPlans(p => [...p, newPlan]);
+          }}
+          onCreatePost={async p => {
+            const newPost = {...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()};
+            await supabase.from('posts').insert([newPost]);
+            setPosts(prev => [newPost, ...prev]);
+          }} 
+          onLikePost={async pid => {
+            const post = posts.find(x => x.id === pid);
+            if (!post) return;
+            const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
+            await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
+            setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
+          }} 
+          onSendMessage={async (c, r) => {
+            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
+            await supabase.from('messages').insert([newMsg]);
+            setMessages(p => [...p, newMsg]);
+          }}
         />
       )}
       {currentUser.role === UserRole.GUARDIAN && (
         <GuardianDashboard 
           students={students.filter(s => s.guardianIds.includes(currentUser.id))} routines={routines} posts={posts} messages={messages} 
           chatConfig={chatConfig} classes={classes} users={users} events={events} menus={menus} currentUserId={currentUser.id}
-          onLikePost={pid => setPosts(p => p.map(x => x.id === pid ? {...x, likes: x.likes.includes(currentUser.id) ? x.likes.filter(id => id !== currentUser.id) : [...x.likes, currentUser.id]} : x))} 
-          onSendMessage={(c, r) => setMessages(p => [...p, {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()}])} 
+          onLikePost={async pid => {
+            const post = posts.find(x => x.id === pid);
+            if (!post) return;
+            const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
+            await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
+            setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
+          }} 
+          onSendMessage={async (c, r) => {
+            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
+            await supabase.from('messages').insert([newMsg]);
+            setMessages(p => [...p, newMsg]);
+          }} 
         />
       )}
     </Layout>
