@@ -35,7 +35,6 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const [
-        { data: dbUsers },
         { data: dbClasses },
         { data: dbStudents },
         { data: dbRoutines },
@@ -43,9 +42,9 @@ const App: React.FC = () => {
         { data: dbPosts },
         { data: dbEvents },
         { data: dbMenus },
-        { data: dbMessages }
+        { data: dbMessages },
+        { data: dbUsers }
       ] = await Promise.all([
-        supabase.from('users').select('*'),
         supabase.from('classes').select('*'),
         supabase.from('students').select('*'),
         supabase.from('routines').select('*'),
@@ -53,10 +52,10 @@ const App: React.FC = () => {
         supabase.from('posts').select('*').order('createdAt', { ascending: false }),
         supabase.from('events').select('*'),
         supabase.from('menus').select('*'),
-        supabase.from('messages').select('*')
+        supabase.from('messages').select('*'),
+        supabase.from('users').select('id, name, email, role, function') // Não trazemos senhas aqui por segurança
       ]);
 
-      if (dbUsers) setUsers(dbUsers);
       if (dbClasses) setClasses(dbClasses);
       if (dbStudents) setStudents(dbStudents);
       if (dbRoutines) setRoutines(dbRoutines);
@@ -65,6 +64,7 @@ const App: React.FC = () => {
       if (dbEvents) setEvents(dbEvents);
       if (dbMenus) setMenus(dbMenus);
       if (dbMessages) setMessages(dbMessages);
+      if (dbUsers) setUsers(dbUsers);
     } catch (error) {
       console.error("Erro Supabase:", error);
     } finally {
@@ -90,26 +90,31 @@ const App: React.FC = () => {
     const { error } = await supabase.from('users').insert([newUser]);
     if (error) return alert("Erro ao cadastrar: " + error.message);
 
-    setUsers(prev => [...prev, newUser]);
-    alert("Escola cadastrada! Faça login.");
+    alert("Escola cadastrada com sucesso!");
+    fetchData();
     setViewState('LOGIN');
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => 
-      u.email.toLowerCase().trim() === loginEmail.toLowerCase().trim() && 
-      u.role === loginRole
-    );
-
-    if (!user) return alert(`Usuário não encontrado para o perfil ${loginRole}.`);
     
-    // Verificação de senha para todos os perfis
-    if (user.password && user.password !== loginPassword) {
+    // VULNERABILIDADE CORRIGIDA: Agora buscamos apenas o usuário tentando logar, em vez de filtrar no front
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', loginEmail.toLowerCase().trim())
+      .eq('role', loginRole)
+      .single();
+
+    if (error || !data) {
+      return alert(`Usuário não encontrado para o perfil ${loginRole}.`);
+    }
+
+    if (data.password !== loginPassword) {
       return alert("Senha incorreta.");
     }
 
-    setCurrentUser(user);
+    setCurrentUser(data);
     setViewState('DASHBOARD');
   };
 
@@ -165,22 +170,22 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50">
         <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-orange-600 font-bold text-xs uppercase tracking-widest">Sincronizando com o Supabase...</p>
+        <p className="text-orange-600 font-bold text-xs uppercase tracking-widest">Sincronizando Dados...</p>
       </div>
     );
   }
 
   if (viewState === 'SIGNUP') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
         <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl border border-orange-100">
           <button onClick={() => setViewState('LOGIN')} className="text-gray-400 font-bold text-xs mb-6 hover:text-orange-500 transition-colors">← VOLTAR AO LOGIN</button>
           <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
           <form onSubmit={handleSignup} className="space-y-4">
-            <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
-            <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
-            <input required type="text" placeholder="Cargo/Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
-            <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
+            <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
+            <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
+            <input required type="text" placeholder="Cargo/Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
+            <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
             <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm hover:scale-[1.02] transition-transform">CADASTRAR ESCOLA</button>
           </form>
         </div>
@@ -190,7 +195,7 @@ const App: React.FC = () => {
 
   if (viewState === 'LOGIN') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
         <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3">🎨</div>
@@ -210,7 +215,7 @@ const App: React.FC = () => {
             <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02]">ENTRAR NO APP</button>
           </form>
           {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre-se</button>}
-          <p className="text-center mt-6 text-[9px] text-gray-400 italic">Dica: Senha padrão para novos professores e pais é "123"</p>
+          <p className="text-center mt-6 text-[9px] text-gray-400 italic">Dica: Senha padrão para novos cadastros é "123"</p>
         </div>
       </div>
     );

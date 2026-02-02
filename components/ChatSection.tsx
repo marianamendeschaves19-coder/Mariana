@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, ChatMessage, ChatConfig, UserRole } from '../types';
 
@@ -38,7 +37,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ currentUser, messages, config
   };
 
   return (
-    <div className="bg-white rounded-[2rem] card-shadow border border-orange-50 overflow-hidden flex flex-col md:flex-row h-[600px]">
+    <div className="bg-white rounded-[2rem] card-shadow border border-orange-50 overflow-hidden flex flex-col md:flex-row h-[600px] font-['Quicksand']">
       {/* Lista de Contatos */}
       <div className="w-full md:w-80 border-r border-gray-100 flex flex-col">
         <div className="p-6 border-b border-gray-50 bg-orange-50/30">
@@ -103,7 +102,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ currentUser, messages, config
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                    className="flex-1 p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-400 text-sm font-medium"
+                    className="flex-1 p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-400 text-sm font-bold text-black"
                   />
                   <button
                     onClick={handleSend}
