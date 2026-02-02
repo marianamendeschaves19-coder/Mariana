@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Class, Student, RoutineEntry, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
-import { INITIAL_USERS, INITIAL_CLASSES, INITIAL_STUDENTS } from './constants';
 import Layout from './components/Layout';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
@@ -14,9 +12,9 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [classes, setClasses] = useState<Class[]>(INITIAL_CLASSES);
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [routines, setRoutines] = useState<RoutineEntry[]>([]);
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -33,7 +31,6 @@ const App: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Busca inicial de dados do Supabase
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -63,14 +60,13 @@ const App: React.FC = () => {
       if (dbClasses) setClasses(dbClasses);
       if (dbStudents) setStudents(dbStudents);
       if (dbRoutines) setRoutines(dbRoutines);
-      // Fix: Cast dbPlans to LessonPlan[] to satisfy status union type
       if (dbPlans) setLessonPlans(dbPlans as LessonPlan[]);
       if (dbPosts) setPosts(dbPosts);
       if (dbEvents) setEvents(dbEvents);
       if (dbMenus) setMenus(dbMenus);
       if (dbMessages) setMessages(dbMessages);
     } catch (error) {
-      console.error("Erro ao carregar dados do Supabase:", error);
+      console.error("Erro Supabase:", error);
     } finally {
       setIsLoading(false);
     }
@@ -82,8 +78,6 @@ const App: React.FC = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (users.some(u => u.email.toLowerCase() === signupEmail.toLowerCase())) return alert("E-mail já cadastrado.");
-    
     const newUser: User = { 
       id: `u-${Date.now()}`, 
       name: signupName, 
@@ -94,19 +88,27 @@ const App: React.FC = () => {
     };
 
     const { error } = await supabase.from('users').insert([newUser]);
-    if (error) return alert("Erro ao cadastrar no banco de dados.");
+    if (error) return alert("Erro ao cadastrar: " + error.message);
 
     setUsers(prev => [...prev, newUser]);
-    alert("Escola cadastrada com sucesso!");
+    alert("Escola cadastrada! Faça login.");
     setViewState('LOGIN');
-    setLoginRole(UserRole.MANAGER);
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => u.email.toLowerCase().trim() === loginEmail.toLowerCase().trim() && u.role === loginRole);
-    if (!user) return alert(`Dados não encontrados para ${loginRole}.`);
-    if (loginRole === UserRole.MANAGER && user.password !== loginPassword) return alert("Senha incorreta.");
+    const user = users.find(u => 
+      u.email.toLowerCase().trim() === loginEmail.toLowerCase().trim() && 
+      u.role === loginRole
+    );
+
+    if (!user) return alert(`Usuário não encontrado para o perfil ${loginRole}.`);
+    
+    // Verificação de senha para todos os perfis
+    if (user.password && user.password !== loginPassword) {
+      return alert("Senha incorreta.");
+    }
+
     setCurrentUser(user);
     setViewState('DASHBOARD');
   };
@@ -121,22 +123,18 @@ const App: React.FC = () => {
   const handleAddStudent = async (studentName: string, classId: string, guardianEmailsStr: string) => {
     const emails = guardianEmailsStr.split(/[,;\n]/).map(e => e.trim().toLowerCase()).filter(e => e !== "");
     const gIds: string[] = [];
-    const newU: User[] = [];
     
-    emails.forEach(email => {
-      let ex = users.find(u => u.email.toLowerCase() === email);
-      if (ex) { 
-        gIds.push(ex.id); 
+    for (const email of emails) {
+      const existing = users.find(u => u.email.toLowerCase() === email);
+      if (existing) {
+        gIds.push(existing.id);
       } else {
         const id = `u-${Math.random().toString(36).substr(2, 9)}`;
-        newU.push({ id, name: `Resp. de ${studentName}`, email, role: UserRole.GUARDIAN });
+        const newGuardian: User = { id, name: `Resp. de ${studentName}`, email, role: UserRole.GUARDIAN, password: '123' };
+        await supabase.from('users').insert([newGuardian]);
+        setUsers(prev => [...prev, newGuardian]);
         gIds.push(id);
       }
-    });
-
-    if (newU.length > 0) {
-      await supabase.from('users').insert(newU);
-      setUsers(prev => [...prev, ...newU]);
     }
 
     const newStudent: Student = { id: `s-${Date.now()}`, name: studentName, classId, guardianIds: gIds };
@@ -150,7 +148,7 @@ const App: React.FC = () => {
     const entry = { ...nr, id };
 
     const { error } = await supabase.from('routines').upsert([entry]);
-    if (error) return alert("Erro ao salvar rotina.");
+    if (error) return alert("Erro ao salvar diário.");
 
     setRoutines(prev => {
       const idx = prev.findIndex(r => r.studentId === nr.studentId && r.date === nr.date);
@@ -163,54 +161,27 @@ const App: React.FC = () => {
     });
   };
 
-  const handleAddClass = async (name: string, teacherId: string) => {
-    const newClass: Class = { id: `c-${Date.now()}`, name, teacherId };
-    await supabase.from('classes').insert([newClass]);
-    setClasses(prev => [...prev, newClass]);
-  };
-
-  const handleDeleteClass = async (id: string) => {
-    await supabase.from('classes').delete().eq('id', id);
-    setClasses(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleDeleteStudent = async (id: string) => {
-    await supabase.from('students').delete().eq('id', id);
-    setStudents(prev => prev.filter(s => s.id !== id));
-  };
-
-  const handleAddEvent = async (e: Omit<SchoolEvent, 'id'>) => {
-    const newEvent = { ...e, id: `e-${Date.now()}` };
-    await supabase.from('events').insert([newEvent]);
-    setEvents(prev => [...prev, newEvent]);
-  };
-
-  const handleDeleteEvent = async (id: string) => {
-    await supabase.from('events').delete().eq('id', id);
-    setEvents(prev => prev.filter(e => e.id !== id));
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50 font-['Quicksand']">
-        <div className="w-16 h-16 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-orange-600 font-black uppercase tracking-widest text-xs">Carregando Aquarela...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-orange-600 font-bold text-xs uppercase tracking-widest">Sincronizando com o Supabase...</p>
       </div>
     );
   }
 
   if (viewState === 'SIGNUP') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50">
         <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl border border-orange-100">
-          <button onClick={() => setViewState('LOGIN')} className="text-gray-900 font-bold text-xs mb-6 block">← VOLTAR</button>
+          <button onClick={() => setViewState('LOGIN')} className="text-gray-400 font-bold text-xs mb-6 hover:text-orange-500 transition-colors">← VOLTAR AO LOGIN</button>
           <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
           <form onSubmit={handleSignup} className="space-y-4">
-            <input required type="text" placeholder="Seu Nome" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-            <input required type="email" placeholder="E-mail" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-            <input required type="text" placeholder="Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-            <input required type="password" placeholder="Sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-300 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase tracking-widest text-sm shadow-xl hover:scale-[1.02] transition-transform">CADASTRAR</button>
+            <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
+            <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
+            <input required type="text" placeholder="Cargo/Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
+            <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold" />
+            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm hover:scale-[1.02] transition-transform">CADASTRAR ESCOLA</button>
           </form>
         </div>
       </div>
@@ -219,12 +190,12 @@ const App: React.FC = () => {
 
   if (viewState === 'LOGIN') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50">
         <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3">🎨</div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tight">Agenda Aquarela</h1>
-            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Onde o aprendizado ganha cores</p>
+            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Conectando Escola e Família</p>
           </div>
           <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-8">
             {[UserRole.GUARDIAN, UserRole.TEACHER, UserRole.MANAGER].map(role => (
@@ -235,10 +206,11 @@ const App: React.FC = () => {
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            {loginRole === UserRole.MANAGER && <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />}
-            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02] active:scale-[0.98]">ENTRAR</button>
+            <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
+            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02]">ENTRAR NO APP</button>
           </form>
-          {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre o Gestor</button>}
+          {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre-se</button>}
+          <p className="text-center mt-6 text-[9px] text-gray-400 italic">Dica: Senha padrão para novos professores e pais é "123"</p>
         </div>
       </div>
     );
@@ -253,10 +225,14 @@ const App: React.FC = () => {
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
           routines={routines} onSaveRoutine={handleSaveRoutine}
-          onAddClass={handleAddClass} 
+          onAddClass={async (name, teacherId) => {
+            const newClass = { id: `c-${Date.now()}`, name, teacherId };
+            await supabase.from('classes').insert([newClass]);
+            setClasses(prev => [...prev, newClass]);
+          }} 
           onAddStudent={handleAddStudent} 
           onAddUser={async (n, e, r, p) => {
-            const newUser = {id: `u-${Date.now()}`, name: n, email: e, role: r, password: p};
+            const newUser = {id: `u-${Date.now()}`, name: n, email: e, role: r, password: p || '123'};
             await supabase.from('users').insert([newUser]);
             setUsers(prev => [...prev, newUser]);
           }}
@@ -266,7 +242,6 @@ const App: React.FC = () => {
           }}
           onApprovePlan={async (pid) => {
             await supabase.from('lesson_plans').update({ status: 'approved' }).eq('id', pid);
-            // Fix: Explicitly cast the mapped object to LessonPlan to ensure 'status' literal compatibility
             setLessonPlans(p => p.map(x => x.id === pid ? ({ ...x, status: 'approved' } as LessonPlan) : x));
           }}
           onCreatePost={async (p) => {
@@ -287,14 +262,27 @@ const App: React.FC = () => {
             setMessages(p => [...p, newMsg]);
           }}
           onUpdateChatConfig={setChatConfig} 
-          onDeleteClass={handleDeleteClass}
-          onDeleteStudent={handleDeleteStudent} 
+          onDeleteClass={async id => {
+            await supabase.from('classes').delete().eq('id', id);
+            setClasses(prev => prev.filter(c => c.id !== id));
+          }}
+          onDeleteStudent={async id => {
+            await supabase.from('students').delete().eq('id', id);
+            setStudents(prev => prev.filter(s => s.id !== id));
+          }} 
           onDeleteUser={async id => {
             await supabase.from('users').delete().eq('id', id);
             setUsers(p => p.filter(u => u.id !== id));
           }}
-          onAddEvent={handleAddEvent} 
-          onDeleteEvent={handleDeleteEvent}
+          onAddEvent={async ev => {
+            const newEvent = { ...ev, id: `e-${Date.now()}` };
+            await supabase.from('events').insert([newEvent]);
+            setEvents(prev => [...prev, newEvent]);
+          }} 
+          onDeleteEvent={async id => {
+            await supabase.from('events').delete().eq('id', id);
+            setEvents(p => p.filter(e => e.id !== id));
+          }}
           onAddMenu={async m => {
             const newMenu = {...m, id: `m-${Date.now()}`};
             await supabase.from('menus').upsert([newMenu]);
@@ -308,7 +296,6 @@ const App: React.FC = () => {
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
           onSaveLessonPlan={async pd => {
-            // Fix: Explicitly type newPlan as LessonPlan to avoid 'status' widening to string
             const newPlan: LessonPlan = { ...pd, id: `p-${Date.now()}`, teacherId: currentUser.id, status: 'pending', createdAt: new Date().toISOString() };
             await supabase.from('lesson_plans').insert([newPlan]);
             setLessonPlans(p => [...p, newPlan]);
