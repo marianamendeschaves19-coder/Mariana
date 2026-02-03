@@ -78,7 +78,8 @@ const App: React.FC = () => {
 
       setLessonPlans((dbPlans || []).map((p: any) => ({
         id: p.id, teacherId: p.professor_id, classId: p.turma_id, date: p.data, status: p.status, 
-        content: p.conteudo_trabalhado, managerFeedback: p.manager_feedback, lessonNumber: p.lesson_number
+        content: p.conteudo_trabalhado, objective: p.objective, managerFeedback: p.manager_feedback, lessonNumber: p.lesson_number,
+        materials: p.materials, bnccCodes: p.bncc_codes
       } as any)));
 
       setPosts((dbPosts || []).map((p: any) => ({
@@ -215,7 +216,7 @@ const App: React.FC = () => {
         <ManagerDashboard 
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
-          routines={routines} onSaveRoutine={handleSaveRoutine}
+          routines={routines}
           onAddClass={async (n, t) => { await supabase.from('turmas').insert([{ nome: n, professor_id: t }]); fetchData(); }}
           onUpdateClassTeacher={async (c, t) => { await supabase.from('turmas').update({ professor_id: t }).eq('id', c); fetchData(); }}
           onDeleteClass={async id => { await supabase.from('turmas').delete().eq('id', id); fetchData(); }}
@@ -252,6 +253,7 @@ const App: React.FC = () => {
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }}
           onUpdateChatConfig={setChatConfig}
           onApprovePlan={async (pid, f) => { await supabase.from('planejamento_professor').update({ status: 'approved', manager_feedback: f }).eq('id', pid); fetchData(); }}
+          onSaveRoutine={handleSaveRoutine}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
@@ -259,7 +261,28 @@ const App: React.FC = () => {
           classes={classes.filter(c => c.teacherId === currentUser.id)} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
-          onSaveLessonPlan={async pd => { await supabase.from('planejamento_professor').upsert([{ professor_id: currentUser.id, turma_id: pd.classId, data: pd.date, conteudo_trabalhado: pd.content, objective: pd.objective, lesson_number: pd.lessonNumber }]); fetchData(); }}
+          onSaveLessonPlan={async pd => { 
+            const payload: any = { 
+              professor_id: currentUser.id, 
+              turma_id: pd.classId, 
+              data: pd.date, 
+              conteudo_trabalhado: pd.content, 
+              objective: pd.objective, 
+              lesson_number: pd.lessonNumber,
+              materials: pd.materials,
+              bncc_codes: pd.bnccCodes
+            };
+            if ((pd as any).id) payload.id = (pd as any).id;
+            
+            await supabase.from('planejamento_professor').upsert([payload]); 
+            fetchData(); 
+          }}
+          onDeleteLessonPlan={async id => {
+            if (confirm("Tem certeza que deseja apagar este plano de aula?")) {
+              await supabase.from('planejamento_professor').delete().eq('id', id);
+              fetchData();
+            }
+          }}
           onCreatePost={handleCreatePost}
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }}
