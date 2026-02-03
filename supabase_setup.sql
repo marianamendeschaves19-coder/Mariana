@@ -1,122 +1,124 @@
--- SCRIPT DE CONFIGURAÇÃO DA AGENDA AQUARELA
--- Execute este script no SQL Editor do seu projeto Supabase
+-- SCRIPT DE CONFIGURAÇÃO FINAL AGENDA AQUARELA
+-- Execute este script no SQL Editor do Supabase para criar as tabelas ausentes.
 
--- 1. Tabela de Usuários
-create table if not exists public.users (
-  id text primary key,
-  name text not null,
-  email text unique not null,
-  role text not null,
-  password text,
-  function text
+-- 1. Usuários
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL,
+    password TEXT,
+    function TEXT
 );
 
--- 2. Tabela de Turmas
-create table if not exists public.classes (
-  id text primary key,
-  name text not null,
-  teacher_id text references public.users(id) on delete set null
+-- 2. Turmas
+CREATE TABLE IF NOT EXISTS public.classes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    teacher_id TEXT REFERENCES public.users(id) ON DELETE SET NULL
 );
 
--- 3. Tabela de Alunos
-create table if not exists public.students (
-  id text primary key,
-  name text not null,
-  class_id text references public.classes(id) on delete cascade,
-  guardian_ids text[]
+-- 3. Alunos
+CREATE TABLE IF NOT EXISTS public.students (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    class_id TEXT REFERENCES public.classes(id) ON DELETE CASCADE,
+    guardian_ids TEXT[] -- Array de IDs de usuários (responsáveis)
 );
 
--- 4. Tabela de Diários/Rotinas
-create table if not exists public.routines (
-  id text primary key,
-  student_id text references public.students(id) on delete cascade,
-  date date not null,
-  attendance text,
-  colacao text,
-  almoco text,
-  lanche text,
-  janta text,
-  banho text,
-  agua text,
-  evacuacao text,
-  fralda text,
-  sleep text,
-  activities text,
-  observations text,
-  mood text,
-  author_id text
+-- 4. Rotinas (Diários)
+CREATE TABLE IF NOT EXISTS public.routines (
+    id TEXT PRIMARY KEY,
+    student_id TEXT REFERENCES public.students(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    attendance TEXT,
+    colacao TEXT,
+    almoco TEXT,
+    lanche TEXT,
+    janta TEXT,
+    banho TEXT,
+    agua TEXT,
+    evacuacao TEXT,
+    fralda TEXT,
+    sleep TEXT,
+    activities TEXT,
+    observations TEXT,
+    mood TEXT,
+    author_id TEXT REFERENCES public.users(id)
 );
 
--- 5. Tabela de Planos de Aula
-create table if not exists public.lesson_plans (
-  id text primary key,
-  teacher_id text references public.users(id) on delete cascade,
-  class_id text references public.classes(id) on delete cascade,
-  date date not null,
-  lesson_number text,
-  grade text,
-  shift text,
-  objective text,
-  content text,
-  materials text,
-  bncc_codes text,
-  structure text,
-  assessment text,
-  status text default 'pending',
-  manager_feedback text,
-  created_at timestamp with time zone default now()
+-- 5. Planos de Aula
+CREATE TABLE IF NOT EXISTS public.lesson_plans (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    class_id TEXT REFERENCES public.classes(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    lesson_number TEXT,
+    grade TEXT,
+    shift TEXT,
+    objective TEXT,
+    content TEXT,
+    materials TEXT,
+    bncc_codes TEXT,
+    structure TEXT,
+    assessment TEXT,
+    status TEXT DEFAULT 'pending',
+    manager_feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. Tabela de Postagens (Mural)
-create table if not exists public.posts (
-  id text primary key,
-  author_id text references public.users(id) on delete cascade,
-  author_name text,
-  author_role text,
-  title text,
-  content text,
-  type text,
-  attachments jsonb,
-  likes text[] default '{}',
-  created_at timestamp with time zone default now()
+-- 6. Mural (Postagens)
+CREATE TABLE IF NOT EXISTS public.posts (
+    id TEXT PRIMARY KEY,
+    author_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    author_name TEXT,
+    author_role TEXT,
+    title TEXT,
+    content TEXT,
+    type TEXT,
+    attachments JSONB,
+    likes TEXT[] DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 7. Tabela de Eventos
-create table if not exists public.events (
-  id text primary key,
-  title text not null,
-  date date not null,
-  description text,
-  location text
+-- 7. Eventos
+CREATE TABLE IF NOT EXISTS public.events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    date DATE NOT NULL,
+    description TEXT,
+    location TEXT
 );
 
--- 8. Tabela de Cardápios
-create table if not exists public.menus (
-  id text primary key,
-  date date unique not null,
-  colacao text,
-  almoco text,
-  lanche text,
-  janta text
+-- 8. Cardápios
+CREATE TABLE IF NOT EXISTS public.menus (
+    id TEXT PRIMARY KEY,
+    date DATE UNIQUE NOT NULL,
+    colacao TEXT,
+    almoco TEXT,
+    lanche TEXT,
+    janta TEXT
 );
 
--- 9. Tabela de Mensagens (Chat)
-create table if not exists public.messages (
-  id text primary key,
-  sender_id text references public.users(id) on delete cascade,
-  receiver_id text references public.users(id) on delete cascade,
-  content text,
-  timestamp timestamp with time zone default now()
+-- 9. Mensagens (Chat)
+CREATE TABLE IF NOT EXISTS public.messages (
+    id TEXT PRIMARY KEY,
+    sender_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    receiver_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    content TEXT,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Habilitar acesso público simplificado (Para desenvolvimento)
--- Nota: Em produção, você deve configurar RLS (Row Level Security)
-alter table public.users disable row level security;
-alter table public.classes disable row level security;
-alter table public.students disable row level security;
-alter table public.routines disable row level security;
-alter table public.lesson_plans disable row level security;
-alter table public.posts disable row level security;
-alter table public.events disable row level security;
-alter table public.menus disable row level security;
-alter table public.messages disable row level security;
+-- Configurações de Acesso (Desabilitar RLS para desenvolvimento)
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.students DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.routines DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_plans DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.posts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.menus DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
+
+-- Notificar o PostgREST para recarregar o cache (Isso acontece automaticamente, mas forçamos se necessário)
+NOTIFY pgrst, 'reload schema';

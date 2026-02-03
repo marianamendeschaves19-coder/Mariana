@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Class, Student, RoutineEntry, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
 import Layout from './components/Layout';
@@ -11,6 +12,13 @@ const App: React.FC = () => {
   const [loginRole, setLoginRole] = useState<UserRole>(UserRole.GUARDIAN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupFunction, setSignupFunction] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
   
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -23,224 +31,162 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [menus, setMenus] = useState<SchoolMenu[]>([]);
 
-  // Form states
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupFunction, setSignupFunction] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-
-  // Helper to load local fallback data
-  const loadLocal = (key: string) => {
-    const data = localStorage.getItem(`aquarela_${key}`);
-    return data ? JSON.parse(data) : [];
-  };
-
-  // Helper to save local fallback data
-  const saveLocal = (key: string, data: any) => {
-    localStorage.setItem(`aquarela_${key}`, JSON.stringify(data));
-  };
-
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const fetchTable = async (table: string) => {
-        try {
-          const { data, error } = await supabase.from(table).select('*');
-          if (error) {
-            // Se for erro de tabela inexistente (PGRST205), logamos apenas um aviso interno
-            if (error.code === 'PGRST205') {
-              console.info(`[Offline Mode] Tabela '${table}' não encontrada no Supabase. Usando dados locais.`);
-            } else {
-              console.warn(`Erro ao buscar ${table}:`, error.message);
-            }
-            return loadLocal(table);
-          }
-          return data;
-        } catch (e) {
-          return loadLocal(table);
-        }
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) return [];
+        return data || [];
       };
 
       const [dbClasses, dbStudents, dbRoutines, dbPlans, dbPosts, dbEvents, dbMenus, dbMessages, dbUsers] = await Promise.all([
-        fetchTable('classes'),
-        fetchTable('students'),
-        fetchTable('routines'),
-        fetchTable('lesson_plans'),
-        fetchTable('posts'),
-        fetchTable('events'),
-        fetchTable('menus'),
-        fetchTable('messages'),
-        fetchTable('users')
+        fetchTable('classes'), fetchTable('students'), fetchTable('routines'),
+        fetchTable('lesson_plans'), fetchTable('posts'), fetchTable('events'),
+        fetchTable('menus'), fetchTable('messages'), fetchTable('users')
       ]);
 
-      if (dbClasses) setClasses(dbClasses);
-      if (dbStudents) setStudents(dbStudents);
-      if (dbRoutines) setRoutines(dbRoutines);
-      if (dbPlans) setLessonPlans(dbPlans as LessonPlan[]);
-      if (dbPosts) setPosts(dbPosts.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      if (dbEvents) setEvents(dbEvents);
-      if (dbMenus) setMenus(dbMenus);
-      if (dbMessages) setMessages(dbMessages);
-      if (dbUsers) setUsers(dbUsers);
+      setClasses(dbClasses.map((c: any) => ({ ...c, teacherId: c.teacher_id })));
+      setStudents(dbStudents.map((s: any) => ({ ...s, classId: s.class_id, guardianIds: s.guardian_ids || [] })));
+      setRoutines(dbRoutines.map((r: any) => ({ ...r, studentId: r.student_id, authorId: r.author_id })));
+      setLessonPlans(dbPlans.map((p: any) => ({ ...p, teacherId: p.teacher_id, classId: p.class_id, lessonNumber: p.lesson_number })));
+      setPosts(dbPosts.map((p: any) => ({ ...p, authorId: p.author_id, authorRole: p.author_role as UserRole })).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      setEvents(dbEvents);
+      setMenus(dbMenus);
+      setMessages(dbMessages.map((m: any) => ({ ...m, senderId: m.sender_id, receiverId: m.receiver_id })));
+      setUsers(dbUsers);
     } catch (error) {
-      console.error("Erro Crítico na Sincronização:", error);
+      console.error("Erro na carga de dados:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser: User = { 
-      id: `u-${Date.now()}`, 
-      name: signupName, 
-      email: signupEmail, 
-      function: signupFunction, 
-      password: signupPassword, 
-      role: UserRole.MANAGER 
-    };
-
-    const { error } = await supabase.from('users').insert([newUser]);
-    if (error) {
-      const currentLocalUsers = loadLocal('users');
-      saveLocal('users', [...currentLocalUsers, newUser]);
-      setUsers([...currentLocalUsers, newUser]);
-      alert("Cadastro realizado (Modo Offline).");
-    } else {
-      alert("Escola cadastrada com sucesso!");
-    }
+    const newUser: User = { id: `u-${Date.now()}`, name: signupName, email: signupEmail, function: signupFunction, password: signupPassword, role: UserRole.MANAGER };
+    await supabase.from('users').insert([newUser]);
+    setUsers(prev => [...prev, newUser]);
     setViewState('LOGIN');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    let { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', loginEmail.toLowerCase().trim())
-      .eq('role', loginRole)
-      .single();
-
-    if (error || !data) {
-      const localUsers = loadLocal('users');
-      data = localUsers.find((u: User) => u.email === loginEmail.toLowerCase().trim() && u.role === loginRole);
-      if (!data) return alert(`Usuário não encontrado.`);
-    }
-
-    if (data.password !== loginPassword) return alert("Senha incorreta.");
-
+    let { data } = await supabase.from('users').select('*').eq('email', loginEmail.toLowerCase().trim()).eq('role', loginRole).single();
+    if (!data || data.password !== loginPassword) return alert("Credenciais inválidas.");
     setCurrentUser(data);
     setViewState('DASHBOARD');
   };
 
-  const handleLogout = () => {
-    setViewState('LOGIN');
-    setCurrentUser(null);
+  const handleLogout = () => { setViewState('LOGIN'); setCurrentUser(null); };
+
+  // CRUD GENÉRICO PARA GESTOR
+  const onSaveUser = async (u: User) => {
+    await supabase.from('users').upsert([u]);
+    setUsers(p => {
+      const idx = p.findIndex(x => x.id === u.id);
+      if (idx >= 0) { const up = [...p]; up[idx] = u; return up; }
+      return [...p, u];
+    });
   };
 
-  const handleAddStudent = async (studentName: string, classId: string, guardianEmailsStr: string) => {
-    const emails = guardianEmailsStr.split(/[,;\n]/).map(e => e.trim().toLowerCase()).filter(e => e !== "");
+  const onSaveClass = async (name: string, teacherId: string, existingId?: string) => {
+    const id = existingId || `c-${Date.now()}`;
+    const payload = { id, name, teacher_id: teacherId };
+    await supabase.from('classes').upsert([payload]);
+    setClasses(p => {
+      const idx = p.findIndex(x => x.id === id);
+      if (idx >= 0) { const up = [...p]; up[idx] = { id, name, teacherId }; return up; }
+      return [...p, { id, name, teacherId }];
+    });
+  };
+
+  const onSaveStudent = async (name: string, classId: string, emailsStr: string, existingId?: string) => {
+    const emails = emailsStr.split(/[,;\n]/).map(e => e.trim().toLowerCase()).filter(e => e !== "");
     const gIds: string[] = [];
-    
     for (const email of emails) {
       const existing = users.find(u => u.email.toLowerCase() === email);
-      if (existing) {
-        gIds.push(existing.id);
-      } else {
+      if (existing) gIds.push(existing.id);
+      else {
         const id = `u-${Math.random().toString(36).substr(2, 9)}`;
-        const newGuardian: User = { id, name: `Resp. de ${studentName}`, email, role: UserRole.GUARDIAN, password: '123' };
-        await supabase.from('users').insert([newGuardian]);
-        setUsers(prev => [...prev, newGuardian]);
+        const newG = { id, name: `Resp. de ${name}`, email, role: UserRole.GUARDIAN, password: '123' };
+        await onSaveUser(newG);
         gIds.push(id);
       }
     }
-
-    const newStudent: Student = { id: `s-${Date.now()}`, name: studentName, classId, guardianIds: gIds };
-    await supabase.from('students').insert([newStudent]);
-    setStudents(prev => [...prev, newStudent]);
+    const id = existingId || `s-${Date.now()}`;
+    const payload = { id, name, class_id: classId, guardian_ids: gIds };
+    await supabase.from('students').upsert([payload]);
+    setStudents(p => {
+      const idx = p.findIndex(x => x.id === id);
+      if (idx >= 0) { const up = [...p]; up[idx] = { id, name, classId, guardianIds: gIds }; return up; }
+      return [...p, { id, name, classId, guardianIds: gIds }];
+    });
   };
 
   const handleSaveRoutine = async (nr: Omit<RoutineEntry, 'id'>) => {
     const existing = routines.find(r => r.studentId === nr.studentId && r.date === nr.date);
     const id = existing ? existing.id : `r-${Date.now()}`;
-    const entry = { ...nr, id };
-
-    await supabase.from('routines').upsert([entry]);
-    
-    setRoutines(prev => {
-      const idx = prev.findIndex(r => r.studentId === nr.studentId && r.date === nr.date);
-      let newState;
-      if (idx >= 0) {
-        newState = [...prev];
-        newState[idx] = entry;
-      } else {
-        newState = [...prev, entry];
-      }
-      saveLocal('routines', newState);
-      return newState;
+    const dbPayload = {
+      id, student_id: nr.studentId, date: nr.date, attendance: nr.attendance,
+      colacao: nr.colacao, almoco: nr.almoco, lanche: nr.lanche, janta: nr.janta,
+      banho: nr.banho, agua: nr.agua, evacuacao: nr.evacuacao, fralda: nr.fralda,
+      sleep: nr.sleep, activities: nr.activities, observations: nr.observations,
+      mood: nr.mood, author_id: nr.authorId
+    };
+    await supabase.from('routines').upsert([dbPayload]);
+    setRoutines(p => {
+      const idx = p.findIndex(x => x.id === id);
+      const entry = { ...nr, id };
+      if (idx >= 0) { const up = [...p]; up[idx] = entry; return up; }
+      return [...p, entry];
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50">
-        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-orange-600 font-bold text-xs uppercase tracking-widest">Aquarela Carregando...</p>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50 font-black text-orange-400 animate-pulse">CARREGANDO AQUARELA...</div>;
 
-  if (viewState === 'SIGNUP') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
-        <div className="bg-white rounded-[2rem] p-8 w-full max-md:p-6 max-w-md shadow-2xl border border-orange-100">
-          <button onClick={() => setViewState('LOGIN')} className="text-gray-400 font-bold text-xs mb-6 hover:text-orange-500 transition-colors">← VOLTAR AO LOGIN</button>
-          <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
-          <form onSubmit={handleSignup} className="space-y-4">
-            <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <input required type="text" placeholder="Cargo/Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm hover:scale-[1.02] transition-transform">CADASTRAR ESCOLA</button>
-          </form>
-        </div>
+  if (viewState === 'SIGNUP') return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+      <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl border border-orange-100">
+        <button onClick={() => setViewState('LOGIN')} className="text-gray-400 font-bold text-xs mb-6 hover:text-orange-500 transition-colors">← VOLTAR AO LOGIN</button>
+        <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
+        <form onSubmit={handleSignup} className="space-y-4">
+          <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <input required type="text" placeholder="Cargo/Função" value={signupFunction} onChange={e => setSignupFunction(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm hover:scale-[1.02] transition-transform">CADASTRAR ESCOLA</button>
+        </form>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (viewState === 'LOGIN') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
-        <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3">🎨</div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Agenda Aquarela</h1>
-            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Conectando Escola e Família</p>
-          </div>
-          <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-8">
-            {[UserRole.GUARDIAN, UserRole.TEACHER, UserRole.MANAGER].map(role => (
-              <button key={role} onClick={() => setLoginRole(role)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${loginRole === role ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
-                {role === UserRole.GUARDIAN ? 'Família' : role === UserRole.TEACHER ? 'Professor' : 'Gestor'}
-              </button>
-            ))}
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-orange-200 font-bold text-black" />
-            <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02]">ENTRAR NO APP</button>
-          </form>
-          {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre-se</button>}
-          <p className="text-center mt-6 text-[9px] text-gray-400 italic">Dica: Senha padrão para novos cadastros é "123"</p>
+  if (viewState === 'LOGIN') return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
+      <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-orange-100">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-orange-100 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner rotate-3">🎨</div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Agenda Aquarela</h1>
+          <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Escola Conectada</p>
         </div>
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-8">
+          {[UserRole.GUARDIAN, UserRole.TEACHER, UserRole.MANAGER].map(role => (
+            <button key={role} onClick={() => setLoginRole(role)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${loginRole === role ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+              {role === UserRole.GUARDIAN ? 'Família' : role === UserRole.TEACHER ? 'Professor' : 'Gestor'}
+            </button>
+          ))}
+        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
+          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02]">ENTRAR</button>
+        </form>
+        {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors">Nova Escola? Cadastre-se</button>}
       </div>
-    );
-  }
+    </div>
+  );
 
   if (!currentUser) return null;
 
@@ -250,116 +196,62 @@ const App: React.FC = () => {
         <ManagerDashboard 
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
-          routines={routines} onSaveRoutine={handleSaveRoutine}
-          onAddClass={async (name, teacherId) => {
-            const newClass = { id: `c-${Date.now()}`, name, teacherId };
-            await supabase.from('classes').insert([newClass]);
-            setClasses(prev => [...prev, newClass]);
-          }} 
-          onAddStudent={handleAddStudent} 
-          onAddUser={async (n, e, r, p) => {
-            const newUser = {id: `u-${Date.now()}`, name: n, email: e, role: r, password: p || '123'};
-            await supabase.from('users').insert([newUser]);
-            setUsers(prev => [...prev, newUser]);
+          routines={routines} 
+          onSaveRoutine={handleSaveRoutine}
+          onAddClass={(n, tId) => onSaveClass(n, tId)} 
+          onUpdateClassTeacher={(cid, tid) => {
+            const cls = classes.find(x => x.id === cid);
+            if(cls) onSaveClass(cls.name, tid, cid);
           }}
-          onUpdateClassTeacher={async (cid, tid) => {
-            await supabase.from('classes').update({ teacherId: tid }).eq('id', cid);
-            setClasses(p => p.map(c => c.id === cid ? {...c, teacherId: tid} : c));
+          onDeleteClass={async id => { await supabase.from('classes').delete().eq('id', id); setClasses(p => p.filter(x => x.id !== id)); }}
+          onAddStudent={(n, cid, es) => onSaveStudent(n, cid, es)}
+          onDeleteStudent={async id => { await supabase.from('students').delete().eq('id', id); setStudents(p => p.filter(x => x.id !== id)); }}
+          onAddUser={(n, e, r, p) => onSaveUser({ id: `u-${Date.now()}`, name: n, email: e, role: r, password: p || '123' })}
+          onDeleteUser={async id => { await supabase.from('users').delete().eq('id', id); setUsers(p => p.filter(x => x.id !== id)); }}
+          onAddEvent={async ev => { 
+            const id = ev.id || `e-${Date.now()}`;
+            const payload = { ...ev, id };
+            await supabase.from('events').upsert([payload]);
+            setEvents(p => {
+              const idx = p.findIndex(x => x.id === id);
+              if(idx >= 0) { const up = [...p]; up[idx] = payload as SchoolEvent; return up; }
+              return [...p, payload as SchoolEvent];
+            });
           }}
-          onApprovePlan={async (pid) => {
-            await supabase.from('lesson_plans').update({ status: 'approved' }).eq('id', pid);
-            setLessonPlans(p => p.map(x => x.id === pid ? ({ ...x, status: 'approved' } as LessonPlan) : x));
+          onDeleteEvent={async id => { await supabase.from('events').delete().eq('id', id); setEvents(p => p.filter(x => x.id !== id)); }}
+          onAddMenu={async m => {
+            const id = m.id || `menu-${Date.now()}`;
+            const payload = { ...m, id };
+            await supabase.from('menus').upsert([payload]);
+            setMenus(p => {
+              const idx = p.findIndex(x => x.id === id || x.date === m.date);
+              if(idx >= 0) { const up = [...p]; up[idx] = payload as SchoolMenu; return up; }
+              return [payload as SchoolMenu, ...p];
+            });
           }}
+          onDeleteMenu={async id => { await supabase.from('menus').delete().eq('id', id); setMenus(p => p.filter(x => x.id !== id)); }}
           onCreatePost={async (p) => {
-            const newPost = {...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()};
-            await supabase.from('posts').insert([newPost]);
-            setPosts(prev => [newPost, ...prev]);
-          }} 
+            const id = `post-${Date.now()}`;
+            const dbPayload = { id, author_id: currentUser.id, author_name: currentUser.name, author_role: currentUser.role, title: p.title, content: p.content, type: p.type, attachments: p.attachments, likes: [] };
+            await supabase.from('posts').insert([dbPayload]);
+            setPosts(prev => [{...dbPayload, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, createdAt: new Date().toISOString()}, ...prev]);
+          }}
           onLikePost={async (pid) => {
             const post = posts.find(x => x.id === pid);
             if (!post) return;
             const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
             await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
             setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
-          }} 
+          }}
           onSendMessage={async (c, r) => {
-            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
-            await supabase.from('messages').insert([newMsg]);
-            setMessages(p => [...p, newMsg]);
+            const id = `m-${Date.now()}`;
+            await supabase.from('messages').insert([{ id, sender_id: currentUser.id, receiver_id: r, content: c }]);
+            setMessages(p => [...p, { id, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString() }]);
           }}
-          onUpdateChatConfig={setChatConfig} 
-          onDeleteClass={async id => {
-            await supabase.from('classes').delete().eq('id', id);
-            setClasses(prev => prev.filter(c => c.id !== id));
-          }}
-          onDeleteStudent={async id => {
-            await supabase.from('students').delete().eq('id', id);
-            setStudents(prev => prev.filter(s => s.id !== id));
-          }} 
-          onDeleteUser={async id => {
-            await supabase.from('users').delete().eq('id', id);
-            setUsers(p => p.filter(u => u.id !== id));
-          }}
-          onAddEvent={async ev => {
-            const newEvent = { ...ev, id: `e-${Date.now()}` };
-            await supabase.from('events').insert([newEvent]);
-            setEvents(prev => [...prev, newEvent]);
-          }} 
-          onDeleteEvent={async id => {
-            await supabase.from('events').delete().eq('id', id);
-            setEvents(p => p.filter(e => e.id !== id));
-          }}
-          onAddMenu={async m => {
-            let existingMenu = menus.find(ex => ex.date === m.date);
-            const payload = ('id' in m) ? m : { ...m, id: existingMenu ? existingMenu.id : `m-${Date.now()}` };
-            
-            try {
-              const { data, error } = await supabase.from('menus').upsert([payload]).select();
-              
-              if (error) {
-                // Silently fallback if table missing
-                console.info(`[Offline Mode] Salvando cardápio localmente.`);
-                setMenus(p => {
-                  const updatedItem = payload as SchoolMenu;
-                  const idx = p.findIndex(x => x.id === updatedItem.id || x.date === updatedItem.date);
-                  let newState;
-                  if (idx >= 0) {
-                    newState = [...p];
-                    newState[idx] = updatedItem;
-                  } else {
-                    newState = [updatedItem, ...p];
-                  }
-                  saveLocal('menus', newState);
-                  return newState;
-                });
-                return;
-              }
-
-              if (data && data[0]) {
-                setMenus(p => {
-                  const updatedItem = data[0];
-                  const exists = p.some(x => x.id === updatedItem.id);
-                  let newState;
-                  if (exists) {
-                    newState = p.map(x => x.id === updatedItem.id ? updatedItem : x);
-                  } else {
-                    newState = [updatedItem, ...p];
-                  }
-                  saveLocal('menus', newState);
-                  return newState;
-                });
-              }
-            } catch (e) {
-              // Ignore and use local
-            }
-          }}
-          onDeleteMenu={async id => {
-            await supabase.from('menus').delete().eq('id', id);
-            setMenus(p => {
-              const newState = p.filter(m => m.id !== id);
-              saveLocal('menus', newState);
-              return newState;
-            });
+          onUpdateChatConfig={setChatConfig}
+          onApprovePlan={async (pid) => {
+            await supabase.from('lesson_plans').update({ status: 'approved' }).eq('id', pid);
+            setLessonPlans(p => p.map(x => x.id === pid ? ({ ...x, status: 'approved' } as LessonPlan) : x));
           }}
         />
       )}
@@ -369,26 +261,26 @@ const App: React.FC = () => {
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
           onSaveLessonPlan={async pd => {
-            const newPlan: LessonPlan = { ...pd, id: `p-${Date.now()}`, teacherId: currentUser.id, status: 'pending', createdAt: new Date().toISOString() };
-            await supabase.from('lesson_plans').insert([newPlan]);
-            setLessonPlans(p => [...p, newPlan]);
+            const id = `p-${Date.now()}`;
+            await supabase.from('lesson_plans').insert([{ id, teacher_id: currentUser.id, class_id: pd.classId, date: pd.date, lesson_number: pd.lessonNumber, grade: pd.grade, objective: pd.objective, content: pd.content, status: 'pending' }]);
+            setLessonPlans(p => [...p, { ...pd, id, teacherId: currentUser.id, status: 'pending', createdAt: new Date().toISOString() } as LessonPlan]);
           }}
-          onCreatePost={async p => {
-            const newPost = {...p, id: `post-${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()};
-            await supabase.from('posts').insert([newPost]);
-            setPosts(prev => [newPost, ...prev]);
-          }} 
+          onCreatePost={async (p) => {
+            const id = `post-${Date.now()}`;
+            await supabase.from('posts').insert([{ id, author_id: currentUser.id, author_name: currentUser.name, author_role: currentUser.role, title: p.title, content: p.content, type: p.type, attachments: p.attachments, likes: [] }]);
+            setPosts(prev => [{...p, id, authorId: currentUser.id, authorName: currentUser.name, authorRole: currentUser.role, likes: [], createdAt: new Date().toISOString()}, ...prev]);
+          }}
           onLikePost={async pid => {
             const post = posts.find(x => x.id === pid);
             if (!post) return;
             const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
             await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
             setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
-          }} 
+          }}
           onSendMessage={async (c, r) => {
-            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
-            await supabase.from('messages').insert([newMsg]);
-            setMessages(p => [...p, newMsg]);
+            const id = `m-${Date.now()}`;
+            await supabase.from('messages').insert([{ id, sender_id: currentUser.id, receiver_id: r, content: c }]);
+            setMessages(p => [...p, { id, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString() }]);
           }}
         />
       )}
@@ -402,11 +294,11 @@ const App: React.FC = () => {
             const newLikes = post.likes.includes(currentUser.id) ? post.likes.filter(id => id !== currentUser.id) : [...post.likes, currentUser.id];
             await supabase.from('posts').update({ likes: newLikes }).eq('id', pid);
             setPosts(p => p.map(x => x.id === pid ? {...x, likes: newLikes} : x));
-          }} 
+          }}
           onSendMessage={async (c, r) => {
-            const newMsg = {id: `m-${Date.now()}`, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString()};
-            await supabase.from('messages').insert([newMsg]);
-            setMessages(p => [...p, newMsg]);
+            const id = `m-${Date.now()}`;
+            await supabase.from('messages').insert([{ id, sender_id: currentUser.id, receiver_id: r, content: c }]);
+            setMessages(p => [...p, { id, senderId: currentUser.id, receiverId: r, content: c, timestamp: new Date().toISOString() }]);
           }} 
         />
       )}

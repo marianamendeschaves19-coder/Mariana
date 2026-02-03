@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Class, Student, User, UserRole, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu, RoutineEntry } from '../types';
 import CreatePostForm from './CreatePostForm';
@@ -17,9 +18,16 @@ interface ManagerDashboardProps {
   menus: SchoolMenu[];
   routines: RoutineEntry[];
   onAddClass: (name: string, teacherId: string) => void;
-  onAddStudent: (studentName: string, classId: string, guardianEmails: string) => void;
-  onAddUser: (name: string, email: string, role: UserRole, password?: string) => void;
   onUpdateClassTeacher: (classId: string, teacherId: string) => void;
+  onDeleteClass: (id: string) => void;
+  onAddStudent: (studentName: string, classId: string, guardianEmails: string) => void;
+  onDeleteStudent: (id: string) => void;
+  onAddUser: (name: string, email: string, role: UserRole, password?: string) => void;
+  onDeleteUser: (id: string) => void;
+  onAddEvent: (event: Partial<SchoolEvent>) => void;
+  onDeleteEvent: (id: string) => void;
+  onAddMenu: (menu: Partial<SchoolMenu>) => void;
+  onDeleteMenu: (id: string) => void;
   onApprovePlan: (planId: string) => void;
   onCreatePost: (post: any) => void;
   onLikePost: (postId: string) => void;
@@ -27,103 +35,72 @@ interface ManagerDashboardProps {
   onUpdateChatConfig: (config: ChatConfig) => void;
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
   currentUserId: string;
-  onDeleteClass: (id: string) => void;
-  onDeleteStudent: (id: string) => void;
-  onDeleteUser: (id: string) => void;
-  onAddEvent: (event: Omit<SchoolEvent, 'id'>) => void;
-  onDeleteEvent: (id: string) => void;
-  onAddMenu: (menu: Omit<SchoolMenu, 'id'> | SchoolMenu) => void;
-  onDeleteMenu?: (id: string) => void;
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
   classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines,
-  onAddClass, onAddStudent, onAddUser, onUpdateClassTeacher, onApprovePlan, onCreatePost, 
-  onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, currentUserId,
-  onDeleteClass, onDeleteStudent, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu
+  onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onDeleteStudent, 
+  onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
+  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, currentUserId
 }) => {
-  const [activeTab, setActiveTab] = useState<'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events' | 'menu' | 'routines'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
   
-  // Menu form states
-  const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
+  // States para Edição
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Formulários
   const [mnDate, setMnDate] = useState(new Date().toISOString().split('T')[0]);
   const [mnCol, setMnCol] = useState('');
   const [mnAlm, setMnAlm] = useState('');
   const [mnLan, setMnLan] = useState('');
   const [mnJan, setMnJan] = useState('');
 
-  const [studentName, setStudentName] = useState('');
-  const [targetClassId, setTargetClassId] = useState('');
-  const [guardianEmail1, setGuardianEmail1] = useState('');
-  
-  const [tName, setTName] = useState('');
-  const [tEmail, setTEmail] = useState('');
   const [className, setClassName] = useState('');
   const [classTeacherId, setClassTeacherId] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [targetClassId, setTargetClassId] = useState('');
+  const [guardianEmails, setGuardianEmails] = useState('');
+  const [tName, setTName] = useState('');
+  const [tEmail, setTEmail] = useState('');
+  const [tRole, setTRole] = useState<UserRole>(UserRole.TEACHER);
   
   const [evTitle, setEvTitle] = useState('');
   const [evDate, setEvDate] = useState('');
   const [evDesc, setEvDesc] = useState('');
+  const [evLoc, setEvLoc] = useState('');
 
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState('');
+  // Rotinas
+  const [selectedRoutineStudent, setSelectedRoutineStudent] = useState<Student | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  const INITIAL_ROUTINE = {
+  const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
     date: new Date().toISOString().split('T')[0],
-    attendance: 'present' as 'present' | 'absent',
-    colacao: 'Comeu tudo', almoco: 'Comeu tudo', lanche: 'Comeu tudo', janta: 'Comeu tudo',
-    banho: 'Sim', agua: 'Bebeu bastante', evacuacao: 'Sim', fralda: '1 troca',
-    sleep: 'Dormiu bem', activities: '', observations: '', mood: 'happy' as any
-  };
+    attendance: 'present', colacao: 'Comeu tudo', almoco: 'Comeu tudo', lanche: 'Comeu tudo', janta: 'Comeu tudo',
+    banho: 'Sim', agua: 'Bebeu bastante', evacuacao: 'Sim', fralda: '1 troca', sleep: 'Dormiu bem', activities: '', observations: '', mood: 'happy'
+  });
 
-  const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>(INITIAL_ROUTINE);
-
-  // Auto-fill form if date already has a menu, but allow manual changes
   useEffect(() => {
-    const existing = menus.find(m => m.date === mnDate);
-    if (existing) {
-      setEditingMenuId(existing.id);
-      setMnCol(existing.colacao);
-      setMnAlm(existing.almoco);
-      setMnLan(existing.lanche);
-      setMnJan(existing.janta);
-    } else {
-      setEditingMenuId(null);
-      setMnCol(''); setMnAlm(''); setMnLan(''); setMnJan('');
+    if (selectedRoutineStudent) {
+      const existing = routines.find(r => r.studentId === selectedRoutineStudent.id && r.date === routineData.date);
+      if (existing) setRoutineData({ ...existing } as any);
+      else setRoutineData(prev => ({ ...prev, activities: '', observations: '' }));
     }
-  }, [mnDate, menus]);
+  }, [selectedRoutineStudent, routineData.date]);
 
-  const handleAddMenuSubmit = (e: React.FormEvent) => {
+  const handleRoutineSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mnDate) return alert("A data é obrigatória.");
-    
-    const menuPayload: any = { 
-      date: mnDate, 
-      colacao: mnCol, 
-      almoco: mnAlm, 
-      lanche: mnLan, 
-      janta: mnJan 
-    };
-    
-    if (editingMenuId) {
-      menuPayload.id = editingMenuId;
-    }
-
-    onAddMenu(menuPayload);
-    
-    // Feedback and clean
-    alert(editingMenuId ? "Cardápio atualizado com sucesso!" : "Cardápio salvo com sucesso!");
+    if (!selectedRoutineStudent) return;
+    onSaveRoutine({ ...routineData, studentId: selectedRoutineStudent.id, authorId: currentUserId });
+    alert("Diário salvo/atualizado!");
   };
 
-  const startEditingMenu = (m: SchoolMenu) => {
-    setMnDate(m.date);
-    setEditingMenuId(m.id);
-    setMnCol(m.colacao);
-    setMnAlm(m.almoco);
-    setMnLan(m.lanche);
-    setMnJan(m.janta);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleAISummary = async () => {
+    setIsGenerating(true);
+    const summary = await generateRoutineSummary(routineData.activities || "aprendizado e descobertas");
+    setRoutineData(prev => ({ ...prev, observations: summary }));
+    setIsGenerating(false);
   };
 
   const formatDate = (dateStr: string) => {
@@ -131,18 +108,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       const d = new Date(dateStr);
       d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
       return d.toLocaleDateString('pt-BR');
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const isToday = (dateStr: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    return dateStr === today;
+    } catch { return dateStr; }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-['Quicksand']">
       <div className="flex gap-2 border-b overflow-x-auto pb-2 scrollbar-hide">
         {[
           { id: 'menu', label: 'CARDÁPIO' }, { id: 'routines', label: 'DIÁRIO' }, { id: 'classes', label: 'TURMAS' }, 
@@ -159,97 +129,174 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {activeTab === 'menu' ? (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <form onSubmit={handleAddMenuSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                    <span>🍎</span> {editingMenuId ? 'Atualizar Cardápio' : 'Novo Cardápio'}
-                  </h3>
-                  {editingMenuId && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[8px] font-black bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full uppercase tracking-widest">Editando Dia {formatDate(mnDate)}</span>
-                      <button type="button" onClick={() => {setEditingMenuId(null); setMnDate(new Date().toISOString().split('T')[0]);}} className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline">Limpar</button>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-orange-400 uppercase ml-1">Data</label>
-                  <input required type="date" value={mnDate} onChange={e => setMnDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border border-transparent focus:border-orange-200 outline-none" />
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-3 space-y-6">
+          {activeTab === 'menu' && (
+            <div className="space-y-6">
+              <form onSubmit={e => { e.preventDefault(); onAddMenu({ date: mnDate, colacao: mnCol, almoco: mnAlm, lanche: mnLan, janta: mnJan }); alert("Cardápio Atualizado!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><span>🍎</span> Gestão de Cardápio</h3>
+                <input required type="date" value={mnDate} onChange={e => setMnDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Colação', value: mnCol, setter: setMnCol, icon: '🍌' },
-                    { label: 'Almoço', value: mnAlm, setter: setMnAlm, icon: '🍲' },
-                    { label: 'Lanche', value: mnLan, setter: setMnLan, icon: '🥪' },
-                    { label: 'Janta', value: mnJan, setter: setMnJan, icon: '🥣' },
-                  ].map(meal => (
-                    <div key={meal.label} className="space-y-1">
-                      <label className="text-[10px] font-black text-orange-400 uppercase ml-1">{meal.icon} {meal.label}</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={meal.value} 
-                        onChange={e => meal.setter(e.target.value)} 
-                        placeholder={`O que será servido?`} 
-                        className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black outline-none border border-transparent focus:border-orange-200 transition-all" 
-                      />
-                    </div>
-                  ))}
+                  <input placeholder="Colação" value={mnCol} onChange={e => setMnCol(e.target.value)} className="p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                  <input placeholder="Almoço" value={mnAlm} onChange={e => setMnAlm(e.target.value)} className="p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                  <input placeholder="Lanche" value={mnLan} onChange={e => setMnLan(e.target.value)} className="p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                  <input placeholder="Janta" value={mnJan} onChange={e => setMnJan(e.target.value)} className="p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
                 </div>
-                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:scale-[1.01] active:scale-95 transition-all">
-                  {editingMenuId ? 'SALVAR ALTERAÇÕES' : 'POSTAR CARDÁPIO'}
-                </button>
+                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">SALVAR CARDÁPIO</button>
               </form>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {menus.length === 0 ? (
-                  <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border-2 border-dashed border-gray-100">
-                    <p className="text-gray-400 italic font-bold">Histórico de cardápios vazio.</p>
+                {menus.map(m => (
+                  <div key={m.id} className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 group flex justify-between items-center">
+                    <div><p className="font-black text-orange-600 text-xs">{formatDate(m.date)}</p><p className="text-xs font-bold text-black mt-1 truncate">{m.almoco}</p></div>
+                    <button onClick={() => onDeleteMenu(m.id)} className="text-red-300 hover:text-red-500">✕</button>
                   </div>
-                ) : (
-                  menus.sort((a,b) => b.date.localeCompare(a.date)).map(m => (
-                    <div key={m.id} className={`bg-white p-6 rounded-[2rem] card-shadow border group hover:border-orange-200 transition-all relative ${isToday(m.date) ? 'border-orange-400 ring-2 ring-orange-50' : 'border-orange-50'}`}>
-                      {isToday(m.date) && (
-                        <div className="absolute -top-3 left-6 bg-orange-500 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-md">Hoje</div>
-                      )}
-                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => startEditingMenu(m)} title="Editar" className="p-2 bg-orange-50 text-orange-500 rounded-xl hover:bg-orange-500 hover:text-white transition-all shadow-sm">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                        </button>
-                        <button onClick={() => { if(confirm("Apagar este cardápio?")) onDeleteMenu?.(m.id); }} title="Excluir" className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>
-                      </div>
-                      <p className="font-black text-orange-600 text-[10px] uppercase mb-4 tracking-widest">{formatDate(m.date)}</p>
-                      <div className="space-y-2 text-xs font-bold text-black">
-                        <p className="flex items-center gap-2"><span className="text-gray-300">🍌</span> <span className="text-gray-400 uppercase text-[8px] font-black w-12">Colação:</span> {m.colacao}</p>
-                        <p className="flex items-center gap-2"><span className="text-gray-300">🍲</span> <span className="text-gray-400 uppercase text-[8px] font-black w-12">Almoço:</span> {m.almoco}</p>
-                        <p className="flex items-center gap-2"><span className="text-gray-300">🥪</span> <span className="text-gray-400 uppercase text-[8px] font-black w-12">Lanche:</span> {m.lanche}</p>
-                        <p className="flex items-center gap-2"><span className="text-gray-300">🥣</span> <span className="text-gray-400 uppercase text-[8px] font-black w-12">Janta:</span> {m.janta}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
             </div>
-          ) : (
-            /* ... Rest of tabs (routines, classes, etc) stay the same as in your index.tsx ... */
-            <div className="bg-white p-8 rounded-[2rem] card-shadow">
-               <p className="text-center py-12 text-gray-400 font-bold">Conteúdo da aba {activeTab} carregado.</p>
+          )}
+
+          {activeTab === 'classes' && (
+            <div className="space-y-6">
+              <form onSubmit={e => { e.preventDefault(); onAddClass(className, classTeacherId); setClassName(''); setClassTeacherId(''); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                <h3 className="text-xl font-black text-gray-900">🎨 Gerenciar Turma</h3>
+                <input required placeholder="Nome da Turma" value={className} onChange={e => setClassName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                <select required value={classTeacherId} onChange={e => setClassTeacherId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200">
+                  <option value="">Selecione o Professor</option>
+                  {users.filter(u => u.role === UserRole.TEACHER).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">SALVAR TURMA</button>
+              </form>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {classes.map(c => (
+                  <div key={c.id} className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 flex justify-between items-center">
+                    <div><h4 className="font-black text-gray-900 text-sm">{c.name}</h4><p className="text-[10px] font-black text-orange-400 uppercase">Prof: {users.find(u => u.id === c.teacherId)?.name}</p></div>
+                    <button onClick={() => onDeleteClass(c.id)} className="text-red-300 hover:text-red-500">✕</button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {activeTab === 'students' && (
+            <div className="space-y-6">
+              <form onSubmit={e => { e.preventDefault(); onAddStudent(studentName, targetClassId, guardianEmails); setStudentName(''); setTargetClassId(''); setGuardianEmails(''); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                <h3 className="text-xl font-black text-gray-900">🧒 Gerenciar Aluno</h3>
+                <input required placeholder="Nome do Aluno" value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                <select required value={targetClassId} onChange={e => setTargetClassId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200">
+                  <option value="">Escolha a Turma</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <input required placeholder="E-mails dos Responsáveis (vírgula)" value={guardianEmails} onChange={e => setGuardianEmails(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">SALVAR ALUNO</button>
+              </form>
+              <div className="bg-white rounded-[2rem] card-shadow overflow-hidden border border-orange-50">
+                <table className="w-full text-left">
+                  <thead className="bg-orange-50 text-[10px] font-black text-orange-400 uppercase"><tr><th className="p-5">Aluno</th><th className="p-5">Turma</th><th className="p-5 text-center">Ações</th></tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {students.map(s => (
+                      <tr key={s.id}>
+                        <td className="p-5 font-bold text-sm text-black">{s.name}</td>
+                        <td className="p-5 font-bold text-xs text-orange-500 uppercase">{classes.find(c => c.id === s.classId)?.name}</td>
+                        <td className="p-5 text-center"><button onClick={() => onDeleteStudent(s.id)} className="text-red-300 hover:text-red-500">✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'users' && (
+            <div className="space-y-6">
+              <form onSubmit={e => { e.preventDefault(); onAddUser(tName, tEmail, tRole); setTName(''); setTEmail(''); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                <h3 className="text-xl font-black text-gray-900">👥 Gestão de Usuários</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input required placeholder="Nome Completo" value={tName} onChange={e => setTName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                  <input required placeholder="E-mail" value={tEmail} onChange={e => setTEmail(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                </div>
+                <select value={tRole} onChange={e => setTRole(e.target.value as UserRole)} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200">
+                  <option value={UserRole.TEACHER}>Professor(a)</option>
+                  <option value={UserRole.MANAGER}>Gestor(a)</option>
+                  <option value={UserRole.GUARDIAN}>Família</option>
+                </select>
+                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">SALVAR USUÁRIO</button>
+              </form>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {users.map(u => (
+                  <div key={u.id} className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 flex justify-between items-center">
+                    <div><h4 className="font-black text-black text-xs truncate">{u.name}</h4><p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{u.role}</p></div>
+                    <button onClick={() => onDeleteUser(u.id)} className="text-red-300 hover:text-red-500">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'routines' && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-100 flex flex-col md:flex-row gap-4">
+                <select className="flex-1 p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black outline-none border-transparent focus:ring-2 focus:ring-orange-200" onChange={e => {
+                  const student = students.find(s => s.id === e.target.value);
+                  setSelectedRoutineStudent(student || null);
+                }}>
+                  <option value="">Selecione um Aluno para ver/editar Diário...</option>
+                  {students.map(s => <option key={s.id} value={s.id}>{s.name} ({classes.find(c => c.id === s.classId)?.name})</option>)}
+                </select>
+                <input type="date" value={routineData.date} onChange={e => setRoutineData({...routineData, date: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black outline-none border-transparent focus:ring-2 focus:ring-orange-200" />
+              </div>
+
+              {selectedRoutineStudent ? (
+                <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-6">
+                  <h3 className="text-lg font-black text-gray-900">Diário de {selectedRoutineStudent.name}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {['Colação', 'Almoço', 'Lanche', 'Janta'].map(field => (
+                      <div key={field} className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">{field}</label>
+                        <select value={(routineData as any)[field.toLowerCase().replace('ç','c')]} onChange={e => setRoutineData({...routineData, [field.toLowerCase().replace('ç','c')]: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-100">
+                          <option>Comeu tudo</option><option>Comeu bem</option><option>Recusou</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center"><label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Atividades</label><button type="button" onClick={handleAISummary} disabled={isGenerating} className="text-[9px] font-black text-white bg-orange-400 px-3 py-1 rounded-full uppercase">{isGenerating ? '...' : 'Auto-Gerar'}</button></div>
+                    <textarea value={routineData.activities} onChange={e => setRoutineData({...routineData, activities: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200 min-h-[100px] resize-none" />
+                  </div>
+                  <textarea placeholder="Observações e Recados" value={routineData.observations} onChange={e => setRoutineData({...routineData, observations: e.target.value})} className="w-full p-4 rounded-2xl bg-orange-50/30 text-sm font-bold text-black border-transparent outline-none focus:ring-2 focus:ring-orange-200 min-h-[100px] resize-none" />
+                  <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">SALVAR DIÁRIO (GESTOR)</button>
+                </form>
+              ) : (
+                <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-orange-100 text-orange-300 font-bold">Escolha um aluno acima para controle total do diário.</div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'plans' && (
+             <div className="space-y-6">
+               {lessonPlans.map(p => (
+                 <div key={p.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50">
+                    <h4 className="font-black text-black text-lg uppercase">{p.grade} - Aula {p.lessonNumber}</h4>
+                    <p className="text-[10px] font-black text-orange-400 uppercase mb-4">Professor: {users.find(u => u.id === p.teacherId)?.name}</p>
+                    <p className="text-xs font-bold text-gray-700 italic mb-6">"{p.objective}"</p>
+                    {p.status === 'pending' && <button onClick={() => onApprovePlan(p.id)} className="w-full bg-green-500 text-white font-black text-[10px] py-4 rounded-2xl shadow-lg uppercase tracking-widest hover:bg-green-600 transition-all">APROVAR PLANEJAMENTO</button>}
+                 </div>
+               ))}
+             </div>
+          )}
+
+          {activeTab === 'mural' && <div className="space-y-8"><CreatePostForm onCreatePost={onCreatePost} /><FeedSection posts={posts} onLikePost={onLikePost} currentUserId={currentUserId} /></div>}
+          {activeTab === 'chat' && <div className="h-[700px]"><ChatSection currentUser={users.find(u => u.id === currentUserId)!} users={users} messages={messages} config={chatConfig} onSendMessage={onSendMessage} availableContacts={users.filter(u => u.id !== currentUserId)} /></div>}
         </div>
 
-        {/* Sidebar blocks stay the same */}
         <div className="space-y-6">
-          <div className="bg-white rounded-[2rem] p-8 text-center border border-orange-100 flex flex-col items-center">
-            <span className="text-4xl mb-4">🎨</span>
-            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-relaxed">Painel Aquarela</p>
-            <p className="text-[8px] text-gray-400 mt-2 italic">Gestor: {users.find(u => u.id === currentUserId)?.name}</p>
+          <div className="bg-white rounded-[2.5rem] p-8 text-center border border-orange-100 flex flex-col items-center card-shadow sticky top-24">
+            <div className="w-20 h-20 bg-orange-100 rounded-[2rem] flex items-center justify-center text-4xl shadow-inner rotate-3 mb-6">🎨</div>
+            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Controle Gestor</p>
+            <h2 className="text-lg font-black text-gray-800 mt-1 mb-6 truncate max-w-full px-2">{users.find(u => u.id === currentUserId)?.name}</h2>
+            <div className="w-full space-y-3 pt-6 border-t border-gray-50">
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Turmas</span><span className="text-sm font-black text-orange-500">{classes.length}</span></div>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Alunos</span><span className="text-sm font-black text-orange-500">{students.length}</span></div>
+            </div>
           </div>
         </div>
       </div>
