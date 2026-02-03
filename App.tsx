@@ -13,14 +13,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // States de Formulário Login
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  
-  // States de Dados Globais
+  // Global Data States
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -32,7 +25,13 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [menus, setMenus] = useState<SchoolMenu[]>([]);
 
-  // Mapeamentos de Banco -> Frontend
+  // Login Form States
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+
   const mapDbRoleToUserRole = (dbRole: string): UserRole => {
     const r = dbRole.toLowerCase();
     if (r === 'gestor') return UserRole.MANAGER;
@@ -59,33 +58,21 @@ const App: React.FC = () => {
       const { data: dbMessages } = await supabase.from('mensagens').select('*');
 
       setUsers((dbUsers || []).map((u: any) => ({
-        id: u.id,
-        name: u.nome,
-        email: u.email,
-        role: mapDbRoleToUserRole(u.tipo)
+        id: u.id, name: u.nome, email: u.email, role: mapDbRoleToUserRole(u.tipo)
       })));
 
       setClasses((dbClasses || []).map((c: any) => ({
-        id: c.id,
-        name: c.nome,
-        teacherId: c.professor_id
+        id: c.id, name: c.nome, teacherId: c.professor_id
       })));
 
       setStudents((dbStudents || []).map((s: any) => ({
-        id: s.id,
-        name: s.nome,
-        classId: s.turma_id,
-        guardianIds: s.responsavel_id ? [s.responsavel_id] : []
+        id: s.id, name: s.nome, classId: s.turma_id, guardianIds: s.responsavel_id ? [s.responsavel_id] : []
       })));
 
       setRoutines((dbRoutines || []).map((r: any) => ({
-        id: r.id, 
-        studentId: r.aluno_id, 
-        date: r.data, 
-        mood: r.humor || 'happy', 
-        observations: r.observacoes_professor || '',
-        activities: r.atividades || '',
-        colacao: r.colacao, almoco: r.almoco, lanche: r.lanche, janta: r.janta,
+        id: r.id, studentId: r.aluno_id, date: r.data, mood: r.humor || 'happy', 
+        attendance: r.attendance || 'present', observations: r.observacoes_professor || '',
+        activities: r.atividades || '', colacao: r.colacao, almoco: r.almoco, lanche: r.lanche, janta: r.janta,
         banho: r.banho, sleep: r.sleep, evacuacao: r.evacuacao, fralda: r.fralda, agua: r.agua
       } as any)));
 
@@ -96,7 +83,8 @@ const App: React.FC = () => {
 
       setPosts((dbPosts || []).map((p: any) => ({
         id: p.id, authorId: p.author_id, authorName: p.author_name, authorRole: mapDbRoleToUserRole(p.author_role || 'professor'), 
-        content: p.content, likes: p.likes || [], createdAt: p.created_at, title: p.title
+        content: p.content, likes: p.likes || [], createdAt: p.created_at, title: p.title, type: p.type || 'general',
+        attachments: p.attachments || []
       } as any)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 
       setEvents((dbEvents || []));
@@ -110,7 +98,7 @@ const App: React.FC = () => {
       setMenus(Object.values(uniqueMenus));
 
     } catch (err) {
-      console.error("Erro ao carregar dados do Supabase:", err);
+      console.error("Erro ao sincronizar dados:", err);
     } finally {
       setIsLoading(false);
     }
@@ -126,34 +114,11 @@ const App: React.FC = () => {
     const tipo = mapUserRoleToDbRole(loginRole);
 
     try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('email', email)
-        .eq('tipo', tipo)
-        .maybeSingle();
+      const { data, error } = await supabase.from('usuarios').select('*').eq('email', email).eq('tipo', tipo).maybeSingle();
+      if (error) return alert("Erro no servidor: " + error.message);
+      if (!data || data.password !== loginPassword) return alert("Credenciais inválidas.");
 
-      if (error) {
-        if (error.message.includes('password')) {
-          return alert("Erro: A coluna 'password' não foi encontrada. Rode o SQL de reparo.");
-        }
-        return alert("Erro de conexão com o banco.");
-      }
-
-      if (!data) {
-        return alert(`Perfil '${loginRole}' não encontrado para este e-mail.`);
-      }
-
-      if (data.password !== loginPassword) {
-        return alert("Senha incorreta!");
-      }
-
-      setCurrentUser({
-        id: data.id,
-        name: data.nome,
-        email: data.email,
-        role: mapDbRoleToUserRole(data.tipo)
-      });
+      setCurrentUser({ id: data.id, name: data.nome, email: data.email, role: mapDbRoleToUserRole(data.tipo) });
       setViewState('DASHBOARD');
     } catch (err) {
       alert("Falha técnica no login.");
@@ -163,16 +128,9 @@ const App: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('usuarios').insert([{
-        nome: signupName,
-        email: signupEmail.toLowerCase().trim(),
-        tipo: 'gestor',
-        password: signupPassword
-      }]);
-
+      const { error } = await supabase.from('usuarios').insert([{ nome: signupName, email: signupEmail.toLowerCase().trim(), tipo: 'gestor', password: signupPassword }]);
       if (error) return alert("Erro no cadastro: " + error.message);
-
-      alert("Escola cadastrada! Entre com seu e-mail e senha.");
+      alert("Gestor cadastrado! Faça login.");
       setViewState('LOGIN');
       fetchData();
     } catch (err) {
@@ -180,72 +138,50 @@ const App: React.FC = () => {
     }
   };
 
-  // Funções de Persistência (Escrita apenas para Manager/Teacher)
-  const onSaveUser = async (u: User) => {
-    const payload: any = {
-      nome: u.name,
-      email: u.email.toLowerCase().trim(),
-      tipo: mapUserRoleToDbRole(u.role),
-      password: u.password || '123'
-    };
-    if (u.id && u.id.length > 10) payload.id = u.id;
-    const { error } = await supabase.from('usuarios').upsert([payload]);
-    if (error) alert("Erro ao salvar usuário: " + error.message);
-    fetchData();
-  };
-
-  const onSaveClass = async (name: string, teacherId: string, existingId?: string) => {
-    const payload = { nome: name, professor_id: teacherId };
-    const { error } = existingId 
-      ? await supabase.from('turmas').update(payload).eq('id', existingId)
-      : await supabase.from('turmas').insert([payload]);
-    if (error) alert("Erro ao salvar turma: " + error.message);
-    fetchData();
-  };
-
-  const onSaveStudent = async (name: string, classId: string, emailsStr: string, existingId?: string) => {
-    const email = emailsStr.split(/[,;\n]/)[0]?.trim().toLowerCase();
-    let respId = null;
-
-    if (email) {
-      const { data: existingUser } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
-      if (existingUser) {
-        respId = existingUser.id;
-      } else {
-        const { data: newUser } = await supabase.from('usuarios').insert([{
-          nome: `Resp. de ${name}`,
-          email,
-          tipo: 'responsavel',
-          password: '123'
-        }]).select().maybeSingle();
-        if (newUser) respId = newUser.id;
-      }
-    }
-
-    const payload = { nome: name, turma_id: classId, responsavel_id: respId };
-    const { error } = existingId 
-      ? await supabase.from('alunos').update(payload).eq('id', existingId)
-      : await supabase.from('alunos').insert([payload]);
-    if (error) alert("Erro ao salvar aluno: " + error.message);
-    fetchData();
-  };
-
   const handleSaveRoutine = async (nr: Omit<RoutineEntry, 'id'>) => {
     const dbPayload = {
       aluno_id: nr.studentId,
       data: nr.date,
       humor: nr.mood,
+      attendance: nr.attendance || 'present',
       atividades: nr.activities,
       observacoes_professor: nr.observations,
       colacao: nr.colacao, almoco: nr.almoco, lanche: nr.lanche, janta: nr.janta,
       banho: nr.banho, sleep: nr.sleep, fralda: nr.fralda, agua: nr.agua, evacuacao: nr.evacuacao
     };
+    
     const { error } = await supabase.from('diario_aluno').upsert([dbPayload], { onConflict: 'aluno_id, data' });
     if (error) alert("Erro ao salvar diário: " + error.message);
-    fetchData();
+    else fetchData();
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50 font-black text-orange-400 animate-pulse uppercase tracking-widest text-lg">Aquarela Carregando...</div>;
+  const handleLikePost = async (postId: string) => {
+    if (!currentUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    const newLikes = post.likes.includes(currentUser.id)
+      ? post.likes.filter(id => id !== currentUser.id)
+      : [...post.likes, currentUser.id];
+
+    const { error } = await supabase.from('mural').update({ likes: newLikes }).eq('id', postId);
+    if (error) console.error("Erro ao curtir:", error);
+    else fetchData();
+  };
+
+  const handleCreatePost = async (p: any) => {
+    if (!currentUser) return;
+    const { error } = await supabase.from('mural').insert([{
+      ...p,
+      author_id: currentUser.id,
+      author_name: currentUser.name,
+      author_role: mapUserRoleToDbRole(currentUser.role)
+    }]);
+    if (error) alert("Erro ao publicar: " + error.message);
+    else fetchData();
+  };
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50 text-orange-400 font-black animate-pulse uppercase">Aquarela Carregando...</div>;
 
   if (viewState === 'LOGIN') return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
@@ -262,26 +198,11 @@ const App: React.FC = () => {
           ))}
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
-          <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm">ENTRAR</button>
+          <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
+          <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
+          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">ENTRAR</button>
         </form>
-        {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase hover:text-orange-500">Nova Escola? Cadastre-se</button>}
-      </div>
-    </div>
-  );
-
-  if (viewState === 'SIGNUP') return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50">
-      <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl border border-orange-100">
-        <button onClick={() => setViewState('LOGIN')} className="text-gray-400 font-bold text-xs mb-6 uppercase">← Voltar</button>
-        <h1 className="text-2xl font-black text-gray-900 text-center mb-8">Cadastro de Gestor</h1>
-        <form onSubmit={handleSignup} className="space-y-4">
-          <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <input required type="email" placeholder="E-mail Institucional" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <input required type="password" placeholder="Defina sua Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase tracking-widest text-sm">CADASTRAR ESCOLA</button>
-        </form>
+        {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase hover:text-orange-500">Nova Escola?</button>}
       </div>
     </div>
   );
@@ -295,36 +216,42 @@ const App: React.FC = () => {
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
           routines={routines} onSaveRoutine={handleSaveRoutine}
-          onAddClass={onSaveClass} 
-          onUpdateClassTeacher={async (classId, teacherId) => {
-            const cls = classes.find(c => c.id === classId);
-            if (cls) await onSaveClass(cls.name, teacherId, classId);
-          }}
+          onAddClass={async (n, t) => { await supabase.from('turmas').insert([{ nome: n, professor_id: t }]); fetchData(); }}
+          onUpdateClassTeacher={async (c, t) => { await supabase.from('turmas').update({ professor_id: t }).eq('id', c); fetchData(); }}
           onDeleteClass={async id => { await supabase.from('turmas').delete().eq('id', id); fetchData(); }}
-          onAddStudent={onSaveStudent}
-          onDeleteStudent={async id => { await supabase.from('alunos').delete().eq('id', id); fetchData(); }}
-          onAddUser={async (name, email, role, password) => {
-            await onSaveUser({ id: '', name, email, role, password });
+          onAddStudent={async (n, c, e) => { 
+            const email = e.split(',')[0].trim().toLowerCase();
+            let respId = null;
+            const { data: ex } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
+            if (ex) respId = ex.id;
+            else {
+              const { data: nu } = await supabase.from('usuarios').insert([{ nome: `Família de ${n}`, email, tipo: 'responsavel', password: '123' }]).select().maybeSingle();
+              if (nu) respId = nu.id;
+            }
+            await supabase.from('alunos').insert([{ nome: n, turma_id: c, responsavel_id: respId }]);
+            fetchData();
           }}
+          onDeleteStudent={async id => { await supabase.from('alunos').delete().eq('id', id); fetchData(); }}
+          onAddUser={async (n, e, r) => { await supabase.from('usuarios').insert([{ nome: n, email: e.toLowerCase(), tipo: mapUserRoleToDbRole(r), password: '123' }]); fetchData(); }}
           onDeleteUser={async id => { await supabase.from('usuarios').delete().eq('id', id); fetchData(); }}
           onAddEvent={async ev => { await supabase.from('eventos').insert([ev]); fetchData(); }}
           onDeleteEvent={async id => { await supabase.from('eventos').delete().eq('id', id); fetchData(); }}
           onAddMenu={async m => { 
             const payload = [
+              { data: m.date, refeicao: 'colacao', descricao: m.colacao },
               { data: m.date, refeicao: 'almoco', descricao: m.almoco },
-              { data: m.date, refeicao: 'lanche', descricao: m.lanche }
-            ].filter(r => r.descricao);
-            await supabase.from('cardapio').upsert(payload); fetchData(); 
+              { data: m.date, refeicao: 'lanche', descricao: m.lanche },
+              { data: m.date, refeicao: 'janta', descricao: m.janta }
+            ].filter(r => r.descricao && r.descricao.trim() !== '');
+            await supabase.from('cardapio').upsert(payload, { onConflict: 'data, refeicao' }); 
+            fetchData(); 
           }}
           onDeleteMenu={async id => { await supabase.from('cardapio').delete().eq('data', id); fetchData(); }}
-          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: 'gestor' }]); fetchData(); }}
-          onLikePost={async pid => { fetchData(); }}
+          onCreatePost={handleCreatePost}
+          onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }}
           onUpdateChatConfig={setChatConfig}
-          onApprovePlan={async (pid, feedback) => { 
-            await supabase.from('planejamento_professor').update({ status: 'approved', manager_feedback: feedback }).eq('id', pid);
-            fetchData();
-          }}
+          onApprovePlan={async (pid, f) => { await supabase.from('planejamento_professor').update({ status: 'approved', manager_feedback: f }).eq('id', pid); fetchData(); }}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
@@ -332,15 +259,9 @@ const App: React.FC = () => {
           classes={classes.filter(c => c.teacherId === currentUser.id)} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
-          onSaveLessonPlan={async pd => { 
-            await supabase.from('planejamento_professor').upsert([{ 
-              professor_id: currentUser.id, turma_id: pd.classId, data: pd.date, 
-              conteudo_trabalhado: pd.content, objective: pd.objective, lesson_number: pd.lessonNumber 
-            }]); 
-            fetchData(); 
-          }}
-          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: 'professor' }]); fetchData(); }}
-          onLikePost={async pid => { fetchData(); }} 
+          onSaveLessonPlan={async pd => { await supabase.from('planejamento_professor').upsert([{ professor_id: currentUser.id, turma_id: pd.classId, data: pd.date, conteudo_trabalhado: pd.content, objective: pd.objective, lesson_number: pd.lessonNumber }]); fetchData(); }}
+          onCreatePost={handleCreatePost}
+          onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }}
         />
       )}
@@ -348,7 +269,7 @@ const App: React.FC = () => {
         <GuardianDashboard 
           students={students.filter(s => s.guardianIds.includes(currentUser.id))} routines={routines} posts={posts} messages={messages} 
           chatConfig={chatConfig} classes={classes} users={users} events={events} menus={menus} currentUserId={currentUser.id}
-          onLikePost={async pid => { fetchData(); }} 
+          onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }} 
         />
       )}
