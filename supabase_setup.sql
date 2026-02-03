@@ -1,5 +1,6 @@
 
--- 1. LIMPEZA TOTAL (OPCIONAL - CUIDADO: APAGA DADOS EXISTENTES)
+-- SCRIPT DEFINITIVO: AGENDA ESCOLAR AQUARELA
+-- 1. Limpeza de Ambiente
 DROP TABLE IF EXISTS public.mensagens CASCADE;
 DROP TABLE IF EXISTS public.eventos CASCADE;
 DROP TABLE IF EXISTS public.mural CASCADE;
@@ -9,15 +10,14 @@ DROP TABLE IF EXISTS public.diario_aluno CASCADE;
 DROP TABLE IF EXISTS public.alunos CASCADE;
 DROP TABLE IF EXISTS public.turmas CASCADE;
 DROP TABLE IF EXISTS public.usuarios CASCADE;
-DROP TABLE IF EXISTS public.escolas CASCADE;
 DROP TYPE IF EXISTS tipo_usuario CASCADE;
 DROP TYPE IF EXISTS tipo_refeicao CASCADE;
 
--- 2. CRIAÇÃO DE TIPOS
+-- 2. Criação de Tipos Customizados
 CREATE TYPE tipo_usuario AS ENUM ('gestor', 'professor', 'responsavel');
 CREATE TYPE tipo_refeicao AS ENUM ('colacao', 'almoco', 'lanche', 'janta');
 
--- 3. TABELA DE USUÁRIOS (COM COLUNA PASSWORD)
+-- 3. Tabela de Usuários (Core)
 CREATE TABLE public.usuarios (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE public.usuarios (
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. TABELA DE TURMAS
+-- 4. Tabela de Turmas
 CREATE TABLE public.turmas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE public.turmas (
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. TABELA DE ALUNOS
+-- 5. Tabela de Alunos
 CREATE TABLE public.alunos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
@@ -44,18 +44,44 @@ CREATE TABLE public.alunos (
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. TABELA DE DIÁRIO (ROTINA)
+-- 6. Tabela de Diário (Rotina Diária)
 CREATE TABLE public.diario_aluno (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     aluno_id UUID NOT NULL REFERENCES public.alunos(id) ON DELETE CASCADE,
     data DATE NOT NULL DEFAULT CURRENT_DATE,
-    humor TEXT,
+    humor TEXT DEFAULT 'happy',
+    colacao TEXT,
+    almoco TEXT,
+    lanche TEXT,
+    janta TEXT,
+    banho TEXT,
+    agua TEXT,
+    evacuacao TEXT,
+    fralda TEXT,
+    sleep TEXT,
+    atividades TEXT,
     observacoes_professor TEXT,
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT unique_diario_aluno_data UNIQUE (aluno_id, data)
 );
 
--- 7. TABELA DE MURAL (POSTS)
+-- 7. Planejamento do Professor
+CREATE TABLE public.planejamento_professor (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    professor_id UUID REFERENCES public.usuarios(id) ON DELETE CASCADE,
+    turma_id UUID REFERENCES public.turmas(id) ON DELETE CASCADE,
+    data DATE NOT NULL,
+    lesson_number TEXT,
+    objective TEXT,
+    conteudo_trabalhado TEXT,
+    assessment TEXT,
+    bncc_codes TEXT,
+    status TEXT DEFAULT 'pending',
+    manager_feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. Mural de Avisos (Feed)
 CREATE TABLE public.mural (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     author_id UUID REFERENCES public.usuarios(id) ON DELETE CASCADE,
@@ -67,26 +93,27 @@ CREATE TABLE public.mural (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 8. OUTRAS TABELAS AUXILIARES
+-- 9. Outras Tabelas
 CREATE TABLE public.eventos (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT, date DATE, description TEXT, location TEXT);
 CREATE TABLE public.cardapio (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), data DATE, refeicao tipo_refeicao, descricao TEXT);
 CREATE TABLE public.mensagens (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), sender_id UUID REFERENCES public.usuarios(id), receiver_id UUID REFERENCES public.usuarios(id), content TEXT, timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW());
-CREATE TABLE public.planejamento_professor (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), professor_id UUID REFERENCES public.usuarios(id), turma_id UUID REFERENCES public.turmas(id), data DATE, objetivo_do_dia TEXT, conteudo_trabalhado TEXT, status TEXT DEFAULT 'pending', manager_feedback TEXT);
 
--- 9. DESABILITAR RLS EM TUDO (REQUISITO)
+-- 10. DESABILITAR RLS (REQUISITO: TODAS AS TABELAS)
 ALTER TABLE public.usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.turmas DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alunos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.diario_aluno DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.planejamento_professor DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mural DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.eventos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cardapio DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mensagens DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.planejamento_professor DISABLE ROW LEVEL SECURITY;
 
--- 10. USUÁRIO DE TESTE
+-- 11. Inserção de Usuário de Teste (Real)
+-- Email: gestor@aquarela.com | Senha: 123
 INSERT INTO public.usuarios (nome, email, tipo, password) 
-VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123');
+VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123')
+ON CONFLICT (email) DO NOTHING;
 
--- 11. RECARREGAR CACHE DO SCHEMA (RESOLVE O ERRO DE COLUNA NÃO ENCONTRADA)
+-- 12. Atualizar Cache do Esquema para o PostgREST
 NOTIFY pgrst, 'reload schema';

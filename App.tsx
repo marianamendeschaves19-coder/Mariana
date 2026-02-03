@@ -13,12 +13,14 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // States de Formulário Login
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   
+  // States de Dados Globais
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -30,6 +32,7 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [menus, setMenus] = useState<SchoolMenu[]>([]);
 
+  // Mapeamentos de Banco -> Frontend
   const mapDbRoleToUserRole = (dbRole: string): UserRole => {
     const r = dbRole.toLowerCase();
     if (r === 'gestor') return UserRole.MANAGER;
@@ -76,15 +79,24 @@ const App: React.FC = () => {
       })));
 
       setRoutines((dbRoutines || []).map((r: any) => ({
-        id: r.id, studentId: r.aluno_id, date: r.data, mood: r.humor || 'happy', observations: r.observacoes_professor || ''
+        id: r.id, 
+        studentId: r.aluno_id, 
+        date: r.data, 
+        mood: r.humor || 'happy', 
+        observations: r.observacoes_professor || '',
+        activities: r.atividades || '',
+        colacao: r.colacao, almoco: r.almoco, lanche: r.lanche, janta: r.janta,
+        banho: r.banho, sleep: r.sleep, evacuacao: r.evacuacao, fralda: r.fralda, agua: r.agua
       } as any)));
 
       setLessonPlans((dbPlans || []).map((p: any) => ({
-        id: p.id, teacherId: p.professor_id, classId: p.turma_id, date: p.data, status: p.status, content: p.conteudo_trabalhado, managerFeedback: p.manager_feedback
+        id: p.id, teacherId: p.professor_id, classId: p.turma_id, date: p.data, status: p.status, 
+        content: p.conteudo_trabalhado, managerFeedback: p.manager_feedback, lessonNumber: p.lesson_number
       } as any)));
 
       setPosts((dbPosts || []).map((p: any) => ({
-        id: p.id, authorId: p.author_id, authorName: p.author_name, authorRole: mapDbRoleToUserRole(p.author_role || 'professor'), content: p.content, likes: p.likes || [], createdAt: p.created_at
+        id: p.id, authorId: p.author_id, authorName: p.author_name, authorRole: mapDbRoleToUserRole(p.author_role || 'professor'), 
+        content: p.content, likes: p.likes || [], createdAt: p.created_at, title: p.title
       } as any)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 
       setEvents((dbEvents || []));
@@ -123,13 +135,13 @@ const App: React.FC = () => {
 
       if (error) {
         if (error.message.includes('password')) {
-          return alert("Erro crítico: A coluna 'password' não foi encontrada no banco. Por favor, execute o script SQL de reparo no editor do Supabase.");
+          return alert("Erro: A coluna 'password' não foi encontrada. Rode o SQL de reparo.");
         }
-        return alert("Erro ao conectar com o banco de dados.");
+        return alert("Erro de conexão com o banco.");
       }
 
       if (!data) {
-        return alert(`Nenhum usuário '${loginRole}' encontrado com este e-mail.`);
+        return alert(`Perfil '${loginRole}' não encontrado para este e-mail.`);
       }
 
       if (data.password !== loginPassword) {
@@ -144,7 +156,7 @@ const App: React.FC = () => {
       });
       setViewState('DASHBOARD');
     } catch (err) {
-      alert("Erro técnico ao tentar logar.");
+      alert("Falha técnica no login.");
     }
   };
 
@@ -158,11 +170,9 @@ const App: React.FC = () => {
         password: signupPassword
       }]);
 
-      if (error) {
-        return alert("Erro ao criar cadastro: " + error.message);
-      }
+      if (error) return alert("Erro no cadastro: " + error.message);
 
-      alert("Escola cadastrada com sucesso! Agora você pode entrar.");
+      alert("Escola cadastrada! Entre com seu e-mail e senha.");
       setViewState('LOGIN');
       fetchData();
     } catch (err) {
@@ -170,6 +180,7 @@ const App: React.FC = () => {
     }
   };
 
+  // Funções de Persistência (Escrita apenas para Manager/Teacher)
   const onSaveUser = async (u: User) => {
     const payload: any = {
       nome: u.name,
@@ -178,7 +189,6 @@ const App: React.FC = () => {
       password: u.password || '123'
     };
     if (u.id && u.id.length > 10) payload.id = u.id;
-    
     const { error } = await supabase.from('usuarios').upsert([payload]);
     if (error) alert("Erro ao salvar usuário: " + error.message);
     fetchData();
@@ -225,7 +235,10 @@ const App: React.FC = () => {
       aluno_id: nr.studentId,
       data: nr.date,
       humor: nr.mood,
-      observacoes_professor: (nr.activities + " " + nr.observations).trim()
+      atividades: nr.activities,
+      observacoes_professor: nr.observations,
+      colacao: nr.colacao, almoco: nr.almoco, lanche: nr.lanche, janta: nr.janta,
+      banho: nr.banho, sleep: nr.sleep, fralda: nr.fralda, agua: nr.agua, evacuacao: nr.evacuacao
     };
     const { error } = await supabase.from('diario_aluno').upsert([dbPayload], { onConflict: 'aluno_id, data' });
     if (error) alert("Erro ao salvar diário: " + error.message);
@@ -251,7 +264,7 @@ const App: React.FC = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <input required type="email" placeholder="E-mail" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
           <input required type="password" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold text-black outline-none focus:ring-2 focus:ring-orange-200" />
-          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm transform transition-transform hover:scale-[1.02]">ENTRAR</button>
+          <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase tracking-widest text-sm">ENTRAR</button>
         </form>
         {loginRole === UserRole.MANAGER && <button onClick={() => setViewState('SIGNUP')} className="w-full text-center mt-6 text-[10px] font-black text-gray-400 uppercase hover:text-orange-500">Nova Escola? Cadastre-se</button>}
       </div>
@@ -319,7 +332,13 @@ const App: React.FC = () => {
           classes={classes.filter(c => c.teacherId === currentUser.id)} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
-          onSaveLessonPlan={async pd => { await supabase.from('planejamento_professor').upsert([{ professor_id: currentUser.id, turma_id: pd.classId, data: pd.date, conteudo_trabalhado: pd.content }]); fetchData(); }}
+          onSaveLessonPlan={async pd => { 
+            await supabase.from('planejamento_professor').upsert([{ 
+              professor_id: currentUser.id, turma_id: pd.classId, data: pd.date, 
+              conteudo_trabalhado: pd.content, objective: pd.objective, lesson_number: pd.lessonNumber 
+            }]); 
+            fetchData(); 
+          }}
           onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: 'professor' }]); fetchData(); }}
           onLikePost={async pid => { fetchData(); }} 
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }}
