@@ -1,5 +1,6 @@
+
 -- SCRIPT DE CONFIGURAÇÃO FINAL AGENDA AQUARELA
--- Execute este script no SQL Editor do Supabase para criar as tabelas ausentes.
+-- Execute este script no SQL Editor do Supabase para criar/atualizar as tabelas.
 
 -- 1. Usuários
 CREATE TABLE IF NOT EXISTS public.users (
@@ -26,24 +27,24 @@ CREATE TABLE IF NOT EXISTS public.students (
     guardian_ids TEXT[] -- Array de IDs de usuários (responsáveis)
 );
 
--- 4. Rotinas (Diários)
+-- 4. Rotinas (Diários) - CAMPOS ATUALIZADOS
 CREATE TABLE IF NOT EXISTS public.routines (
     id TEXT PRIMARY KEY,
     student_id TEXT REFERENCES public.students(id) ON DELETE CASCADE,
     date DATE NOT NULL,
-    attendance TEXT,
+    attendance TEXT DEFAULT 'present',
     colacao TEXT,
     almoco TEXT,
     lanche TEXT,
     janta TEXT,
-    banho TEXT,
-    agua TEXT,
-    evacuacao TEXT,
-    fralda TEXT,
-    sleep TEXT,
+    banho TEXT DEFAULT 'Não',
+    agua TEXT DEFAULT 'Bebeu bem',
+    evacuacao TEXT DEFAULT 'Não',
+    fralda TEXT DEFAULT 'Seca',
+    sleep TEXT DEFAULT 'Dormiu bem',
     activities TEXT,
     observations TEXT,
-    mood TEXT,
+    mood TEXT DEFAULT 'happy',
     author_id TEXT REFERENCES public.users(id)
 );
 
@@ -109,7 +110,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Configurações de Acesso (Desabilitar RLS para desenvolvimento)
+-- Desabilitar RLS para facilitar o desenvolvimento (EM PRODUÇÃO, HABILITAR E CONFIGURAR POLÍTICAS)
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.students DISABLE ROW LEVEL SECURITY;
@@ -120,5 +121,4 @@ ALTER TABLE public.events DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menus DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
 
--- Notificar o PostgREST para recarregar o cache (Isso acontece automaticamente, mas forçamos se necessário)
 NOTIFY pgrst, 'reload schema';

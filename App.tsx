@@ -82,7 +82,6 @@ const App: React.FC = () => {
 
   const handleLogout = () => { setViewState('LOGIN'); setCurrentUser(null); };
 
-  // CRUD GENÉRICO PARA GESTOR
   const onSaveUser = async (u: User) => {
     await supabase.from('users').upsert([u]);
     setUsers(p => {
@@ -145,7 +144,7 @@ const App: React.FC = () => {
     });
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50 font-black text-orange-400 animate-pulse">CARREGANDO AQUARELA...</div>;
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-orange-50 font-black text-orange-400 animate-pulse uppercase tracking-[0.2em]">Agenda Aquarela</div>;
 
   if (viewState === 'SIGNUP') return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 font-['Quicksand']">
