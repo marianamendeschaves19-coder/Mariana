@@ -31,12 +31,33 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [menus, setMenus] = useState<SchoolMenu[]>([]);
 
+  const mapDbRoleToUserRole = (dbRole: string): UserRole => {
+    switch (dbRole) {
+      case 'gestor': return UserRole.MANAGER;
+      case 'professor': return UserRole.TEACHER;
+      case 'responsavel': return UserRole.GUARDIAN;
+      default: return UserRole.GUARDIAN;
+    }
+  };
+
+  const mapUserRoleToDbRole = (role: UserRole): string => {
+    switch (role) {
+      case UserRole.MANAGER: return 'gestor';
+      case UserRole.TEACHER: return 'professor';
+      case UserRole.GUARDIAN: return 'responsavel';
+      default: return 'responsavel';
+    }
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const fetchTable = async (table: string) => {
         const { data, error } = await supabase.from(table).select('*');
-        if (error) return [];
+        if (error) {
+          console.error(`Erro ao carregar tabela ${table}:`, error);
+          return [];
+        }
         return data || [];
       };
 
@@ -47,32 +68,74 @@ const App: React.FC = () => {
       ]);
 
       // Mapeamento de nomes de colunas do DB para as Interfaces TS
-      setClasses(dbClasses.map((c: any) => ({ ...c, teacherId: c.professor_id })));
-      setStudents(dbStudents.map((s: any) => ({ ...s, classId: s.turma_id, guardianIds: [s.responsavel_id] })));
-      setRoutines(dbRoutines.map((r: any) => ({ 
-        ...r, 
-        studentId: r.aluno_id, 
-        authorId: r.aluno_id, // Exemplo, na prática viria de outro lugar
-        attendance: r.dormiu === 'sim' ? 'present' : 'present' // Mapeamento simplificado
+      setClasses(dbClasses.map((c: any) => ({ 
+        id: c.id,
+        name: c.nome,
+        teacherId: c.professor_id 
       })));
+
+      setStudents(dbStudents.map((s: any) => ({ 
+        id: s.id,
+        name: s.nome,
+        classId: s.turma_id, 
+        guardianIds: s.responsavel_id ? [s.responsavel_id] : [] 
+      })));
+
+      setRoutines(dbRoutines.map((r: any) => ({ 
+        id: r.id,
+        studentId: r.aluno_id, 
+        date: r.data,
+        attendance: 'present', // Placeholder logic
+        colacao: 'comeu tudo', // Placeholder
+        almoco: 'comeu tudo',
+        lanche: 'comeu tudo',
+        janta: 'comeu tudo',
+        mood: r.humor || 'happy',
+        activities: r.observacoes_professor || '',
+        observations: r.observacoes_professor || '',
+        authorId: r.aluno_id // Placeholder
+      })));
+
       setLessonPlans(dbPlans.map((p: any) => ({ 
-        ...p, 
+        id: p.id,
         teacherId: p.professor_id, 
         classId: p.turma_id, 
-        lessonNumber: p.id.slice(0, 4), // Placeholder
+        date: p.data,
+        lessonNumber: '1',
+        grade: '', 
+        shift: '',
+        objective: p.objetivo_do_dia || '',
+        content: p.conteudo_trabalhado || '',
+        materials: p.recursos_utilizados || '',
+        bnccCodes: '',
+        structure: '',
+        assessment: p.avaliacao_do_dia || '',
+        status: (p.status || 'pending') as 'pending' | 'approved',
         managerFeedback: p.manager_feedback,
-        bnccCodes: ''
+        createdAt: p.criado_em
       })));
+
       setPosts(dbPosts.map((p: any) => ({ 
-        ...p, 
+        id: p.id,
         authorId: p.author_id, 
-        authorRole: p.author_role as UserRole, 
-        createdAt: p.created_at,
-        authorName: p.author_name
+        authorName: p.author_name || 'Usuário',
+        authorRole: mapDbRoleToUserRole(p.author_role || 'professor'), 
+        title: p.title || '',
+        content: p.content || '',
+        type: (p.type || 'general') as any,
+        attachments: p.attachments || [],
+        likes: p.likes || [],
+        createdAt: p.created_at
       })).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      setEvents(dbEvents);
+
+      setEvents(dbEvents.map((ev: any) => ({
+        id: ev.id,
+        title: ev.title,
+        date: ev.date,
+        description: ev.description || '',
+        location: ev.location || ''
+      })));
       
-      // Cardápio mensal agrupado (simplificado para SchoolMenu interface)
       const uniqueMenus = dbMenus.reduce((acc: any, curr: any) => {
         if (!acc[curr.data]) acc[curr.data] = { date: curr.data, id: curr.data };
         acc[curr.data][curr.refeicao] = curr.descricao;
@@ -80,10 +143,22 @@ const App: React.FC = () => {
       }, {});
       setMenus(Object.values(uniqueMenus));
 
-      setMessages(dbMessages.map((m: any) => ({ ...m, senderId: m.sender_id, receiverId: m.receiver_id })));
-      setUsers(dbUsers.map((u: any) => ({ ...u, role: u.tipo.toUpperCase() as UserRole })));
+      setMessages(dbMessages.map((m: any) => ({ 
+        id: m.id,
+        senderId: m.sender_id, 
+        receiverId: m.receiver_id,
+        content: m.content || '',
+        timestamp: m.timestamp
+      })));
+
+      setUsers(dbUsers.map((u: any) => ({ 
+        id: u.id,
+        name: u.nome,
+        email: u.email,
+        role: mapDbRoleToUserRole(u.tipo)
+      })));
     } catch (error) {
-      console.error("Erro na carga de dados:", error);
+      console.error("Erro crítico na carga de dados:", error);
     } finally {
       setIsLoading(false);
     }
@@ -93,9 +168,31 @@ const App: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    let { data } = await supabase.from('usuarios').select('*').eq('email', loginEmail.toLowerCase().trim()).single();
-    if (!data || data.password !== loginPassword) return alert("Credenciais inválidas.");
-    const mappedUser = { ...data, role: data.tipo.toUpperCase() as UserRole };
+    const emailToSearch = loginEmail.toLowerCase().trim();
+    const dbRoleToSearch = mapUserRoleToDbRole(loginRole);
+
+    let { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('email', emailToSearch)
+      .eq('tipo', dbRoleToSearch)
+      .single();
+
+    if (error || !data) {
+      return alert("Usuário não encontrado para este perfil.");
+    }
+
+    if (data.password !== loginPassword) {
+      return alert("Senha incorreta.");
+    }
+
+    const mappedUser: User = { 
+      id: data.id,
+      name: data.nome,
+      email: data.email,
+      role: mapDbRoleToUserRole(data.tipo)
+    };
+
     setCurrentUser(mappedUser);
     setViewState('DASHBOARD');
   };
@@ -116,16 +213,15 @@ const App: React.FC = () => {
   const onSaveUser = async (u: User) => {
     const payload = { 
       nome: u.name, 
-      email: u.email, 
-      tipo: u.role.toLowerCase(), 
-      password: u.password 
+      email: u.email.toLowerCase().trim(), 
+      tipo: mapUserRoleToDbRole(u.role), 
+      password: u.password || '123'
     };
     await supabase.from('usuarios').upsert([payload]);
     fetchData();
   };
 
   const onSaveClass = async (name: string, teacherId: string, existingId?: string) => {
-    // FIX: professor_id em vez de teacher_id
     const payload = { nome: name, professor_id: teacherId };
     if (existingId) {
       const { error } = await supabase.from('turmas').update(payload).eq('id', existingId);
@@ -146,12 +242,15 @@ const App: React.FC = () => {
       if (existingUser) {
         respId = existingUser.id;
       } else {
-        const { data: newUser } = await supabase.from('usuarios').insert([{ 
+        const { data: newUser, error: createError } = await supabase.from('usuarios').insert([{ 
           nome: `Resp. de ${name}`, 
           email, 
           tipo: 'responsavel', 
           password: '123' 
         }]).select().single();
+        if (createError) {
+          console.error("Erro ao criar responsável:", createError);
+        }
         if (newUser) respId = newUser.id;
       }
     }
@@ -169,12 +268,12 @@ const App: React.FC = () => {
     const dbPayload = {
       aluno_id: nr.studentId, 
       data: nr.date,
-      colacao: 'comeu', // Mock mapping
+      colacao: 'comeu', 
       almoco: 'comeu',
       lanche: 'comeu',
       janta: 'comeu',
       humor: nr.mood,
-      observacoes_professor: nr.activities + " " + nr.observations
+      observacoes_professor: (nr.activities + " " + nr.observations).trim()
     };
     
     const { error } = await supabase.from('diario_aluno').upsert([dbPayload], { onConflict: 'aluno_id, data' });
@@ -283,7 +382,7 @@ const App: React.FC = () => {
           onDeleteStudent={async id => { await supabase.from('alunos').delete().eq('id', id); fetchData(); }}
           onAddUser={async (name, email, role, password) => {
             await onSaveUser({ 
-              id: `u-${Date.now()}`, 
+              id: '', 
               name, 
               email: email.toLowerCase().trim(), 
               role, 
@@ -295,7 +394,7 @@ const App: React.FC = () => {
           onDeleteEvent={async id => { await supabase.from('eventos').delete().eq('id', id); fetchData(); }}
           onAddMenu={onAddMenu}
           onDeleteMenu={async id => { await supabase.from('cardapio').delete().eq('data', id); fetchData(); }}
-          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: currentUser.role, likes: [] }]); fetchData(); }}
+          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: mapUserRoleToDbRole(currentUser.role), likes: [] }]); fetchData(); }}
           onLikePost={async pid => { 
              const post = posts.find(p => p.id === pid);
              if (post) {
@@ -322,7 +421,7 @@ const App: React.FC = () => {
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
           onSaveRoutine={handleSaveRoutine} 
           onSaveLessonPlan={onSaveLessonPlan}
-          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: currentUser.role, likes: [] }]); fetchData(); }}
+          onCreatePost={async p => { await supabase.from('mural').insert([{ ...p, author_id: currentUser.id, author_name: currentUser.name, author_role: mapUserRoleToDbRole(currentUser.role), likes: [] }]); fetchData(); }}
           onLikePost={async pid => {
              const post = posts.find(p => p.id === pid);
              if (post) {
