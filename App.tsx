@@ -53,7 +53,7 @@ const App: React.FC = () => {
         supabase.from('events').select('*'),
         supabase.from('menus').select('*'),
         supabase.from('messages').select('*'),
-        supabase.from('users').select('id, name, email, role, function') // Não trazemos senhas aqui por segurança
+        supabase.from('users').select('id, name, email, role, function')
       ]);
 
       if (dbClasses) setClasses(dbClasses);
@@ -97,8 +97,6 @@ const App: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // VULNERABILIDADE CORRIGIDA: Agora buscamos apenas o usuário tentando logar, em vez de filtrar no front
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -106,13 +104,8 @@ const App: React.FC = () => {
       .eq('role', loginRole)
       .single();
 
-    if (error || !data) {
-      return alert(`Usuário não encontrado para o perfil ${loginRole}.`);
-    }
-
-    if (data.password !== loginPassword) {
-      return alert("Senha incorreta.");
-    }
+    if (error || !data) return alert(`Usuário não encontrado.`);
+    if (data.password !== loginPassword) return alert("Senha incorreta.");
 
     setCurrentUser(data);
     setViewState('DASHBOARD');
@@ -289,9 +282,24 @@ const App: React.FC = () => {
             setEvents(p => p.filter(e => e.id !== id));
           }}
           onAddMenu={async m => {
-            const newMenu = {...m, id: `m-${Date.now()}`};
-            await supabase.from('menus').upsert([newMenu]);
-            setMenus(p => [...p.filter(x => x.date !== m.date), newMenu]);
+            const { data, error } = await supabase.from('menus').upsert([m]).select();
+            if (error) return alert("Erro ao salvar cardápio.");
+            if (data) {
+              setMenus(p => {
+                const existingIdx = p.findIndex(x => x.id === data[0].id);
+                if (existingIdx >= 0) {
+                  const updated = [...p];
+                  updated[existingIdx] = data[0];
+                  return updated;
+                }
+                return [...p, data[0]];
+              });
+            }
+          }}
+          onDeleteMenu={async id => {
+            const { error } = await supabase.from('menus').delete().eq('id', id);
+            if (error) return alert("Erro ao excluir cardápio.");
+            setMenus(p => p.filter(m => m.id !== id));
           }}
         />
       )}
