@@ -111,6 +111,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const currentManager = users.find(u => u.id === currentUserId) || { id: currentUserId, name: 'Gestor', role: UserRole.MANAGER, email: '' };
 
+  const getRoleStyle = (role: UserRole) => {
+    switch(role) {
+      case UserRole.MANAGER: return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', icon: '🔑', label: 'Gestor' };
+      case UserRole.TEACHER: return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', icon: '👩‍🏫', label: 'Professor' };
+      case UserRole.GUARDIAN: return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100', icon: '🏠', label: 'Família' };
+      default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100', icon: '👤', label: 'Usuário' };
+    }
+  };
+
   return (
     <div className="space-y-6 font-['Quicksand']">
       <div className="flex gap-2 border-b overflow-x-auto pb-2 scrollbar-hide">
@@ -244,7 +253,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
           )}
 
-          {/* Aba Equipe */}
+          {/* Aba Equipe (ATUALIZADA) */}
           {activeTab === 'users' && (
             <div className="space-y-6 animate-in fade-in">
               <form onSubmit={e => { e.preventDefault(); onAddUser(tName, tEmail, tRole); setTName(''); setTEmail(''); alert("Usuário cadastrado com sucesso!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
@@ -261,22 +270,39 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">CADASTRAR NOVO MEMBRO</button>
               </form>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {users.map(u => (
-                  <div key={u.id} className="p-4 bg-white rounded-2xl border flex justify-between items-center text-xs card-shadow border-orange-50">
-                    <div>
-                      <p className="font-bold text-gray-800">{u.name}</p>
-                      <p className="text-gray-400 uppercase font-black text-[8px]">{u.role === UserRole.MANAGER ? 'Gestor' : u.role === UserRole.TEACHER ? 'Professor' : 'Família'}</p>
-                      <p className="text-gray-400 text-[9px]">{u.email}</p>
-                    </div>
-                    {u.id !== currentUserId && <button onClick={() => onDeleteUser(u.id)} className="text-red-500 font-bold hover:scale-110 transition-transform">🗑️</button>}
-                  </div>
-                ))}
+              <div className="space-y-4">
+                 <h4 className="text-sm font-black text-gray-700 uppercase tracking-widest ml-1">Membros Cadastrados</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {users.sort((a,b) => a.role.localeCompare(b.role)).map(u => {
+                      const style = getRoleStyle(u.role);
+                      return (
+                        <div key={u.id} className={`p-5 rounded-[1.5rem] border ${style.border} ${style.bg} card-shadow transition-all hover:scale-[1.02] flex justify-between items-start`}>
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{style.icon}</span>
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${style.text} bg-white border`}>{style.label}</span>
+                            </div>
+                            <p className="font-black text-gray-900 truncate text-sm">{u.name}</p>
+                            <p className="text-[10px] font-bold text-gray-500 truncate">{u.email}</p>
+                          </div>
+                          {u.id !== currentUserId && (
+                            <button 
+                              onClick={() => onDeleteUser(u.id)} 
+                              className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                              title="Remover usuário"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                 </div>
               </div>
             </div>
           )}
 
-          {/* Abas Mural, Chat, Eventos, Diário e Planejamento (Omitidos por brevidade, mantendo lógica anterior aprimorada) */}
+          {/* Abas Mural, Chat, Eventos, Diário e Planejamento (Aprimorados) */}
           {activeTab === 'mural' && <div className="space-y-8 animate-in fade-in"><CreatePostForm onCreatePost={onCreatePost} /><FeedSection posts={posts} onLikePost={onLikePost} currentUserId={currentUserId} /></div>}
           {activeTab === 'chat' && (
             <ChatSection 
@@ -351,7 +377,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               {selectedRoutineStudent && (
                  <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-6">
                     <h3 className="text-lg font-black text-gray-900 leading-tight">Revisão do Diário: {selectedRoutineStudent.name}</h3>
-                    {/* Campos de rotina iguais ao do professor mas com permissão de edição pelo gestor */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
                           <div key={field}>
@@ -379,7 +404,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             <div className="w-full space-y-3 pt-6 border-t border-gray-50">
               <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Turmas</span><span className="text-sm font-black text-orange-500">{classes.length}</span></div>
               <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Alunos</span><span className="text-sm font-black text-orange-500">{students.length}</span></div>
-              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Equipe</span><span className="text-sm font-black text-orange-500">{users.filter(u => u.role !== UserRole.GUARDIAN).length}</span></div>
+              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Gestores</span><span className="text-sm font-black text-purple-500">{users.filter(u => u.role === UserRole.MANAGER).length}</span></div>
+              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Professores</span><span className="text-sm font-black text-blue-500">{users.filter(u => u.role === UserRole.TEACHER).length}</span></div>
+              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl"><span className="text-[9px] font-black text-gray-400 uppercase">Famílias</span><span className="text-sm font-black text-orange-500">{users.filter(u => u.role === UserRole.GUARDIAN).length}</span></div>
             </div>
           </div>
         </div>
