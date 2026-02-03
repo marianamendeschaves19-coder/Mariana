@@ -33,19 +33,44 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
     date: new Date().toISOString().split('T')[0],
-    attendance: 'present', colacao: 'Comeu tudo', almoco: 'Comeu tudo', lanche: 'Comeu tudo', janta: 'Comeu tudo',
-    banho: 'Não', agua: 'Bebeu bem', evacuacao: 'Não', fralda: 'Seca', sleep: 'Dormiu bem', activities: '', observations: '', mood: 'happy'
+    attendance: 'present', 
+    colacao: 'comeu tudo', 
+    almoco: 'comeu tudo', 
+    lanche: 'comeu tudo', 
+    janta: 'comeu tudo',
+    banho: 'não', 
+    agua: 'bebeu bastante', 
+    evacuacao: 'não', 
+    fralda: '1x', 
+    sleep: 'dormiu', 
+    activities: '', 
+    observations: '', 
+    mood: 'happy'
   });
 
   const [planData, setPlanData] = useState({
-    date: new Date().toISOString().split('T')[0], lessonNumber: '', classId: '', materials: '', objective: '', content: '', assessment: ''
+    date: new Date().toISOString().split('T')[0], lessonNumber: '', classId: '', materials: '', objective: '', content: '', assessment: '', bnccCodes: ''
   });
 
   useEffect(() => {
     if (selectedStudent) {
       const existing = routines.find(r => r.studentId === selectedStudent.id && r.date === routineData.date);
       if (existing) setRoutineData({ ...existing } as any);
-      else setRoutineData(prev => ({ ...prev, activities: '', observations: '', attendance: 'present' }));
+      else setRoutineData(prev => ({ 
+        ...prev, 
+        activities: '', 
+        observations: '', 
+        attendance: 'present',
+        colacao: 'comeu tudo', 
+        almoco: 'comeu tudo', 
+        lanche: 'comeu tudo', 
+        janta: 'comeu tudo',
+        banho: 'não', 
+        agua: 'bebeu bastante', 
+        evacuacao: 'não', 
+        fralda: '1x', 
+        sleep: 'dormiu'
+      }));
     }
   }, [selectedStudent, routineData.date]);
 
@@ -95,7 +120,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h3 className="text-xl font-black text-gray-900 leading-tight">Agenda de {selectedStudent.name}</h3>
-                    <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mt-1">Status: {routines.some(r => r.studentId === selectedStudent.id && r.date === routineData.date) ? 'Atualizando Registro' : 'Novo Registro'}</p>
                   </div>
                   <input type="date" value={routineData.date} onChange={e => setRoutineData({...routineData, date: e.target.value})} className="text-xs font-bold text-orange-600 bg-orange-50 px-4 py-2 rounded-full border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
                 </div>
@@ -108,104 +132,147 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {routineData.attendance === 'present' && (
                   <>
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🍎 Alimentação e Hidratação</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {['Colação', 'Almoço', 'Lanche', 'Janta'].map(field => (
+                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🍎 Alimentação</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
                           <div key={field}>
                             <label className="text-[9px] font-black text-gray-400 uppercase ml-1">{field}</label>
-                            <select value={(routineData as any)[field.toLowerCase().replace('ç','c')]} onChange={e => setRoutineData({...routineData, [field.toLowerCase().replace('ç','c')]: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                              <option>Comeu tudo</option><option>Comeu bem</option><option>Comeu pouco</option><option>Recusou</option>
+                            <select value={(routineData as any)[field.toLowerCase()]} onChange={e => setRoutineData({...routineData, [field.toLowerCase()]: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                              <option value="comeu tudo">Comeu tudo</option>
+                              <option value="comeu bem">Comeu bem</option>
+                              <option value="comeu metade">Comeu metade</option>
+                              <option value="recusou">Recusou</option>
+                              <option value="não ofertado">Não ofertado</option>
                             </select>
                           </div>
                         ))}
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Água</label>
-                          <select value={routineData.agua} onChange={e => setRoutineData({...routineData, agua: e.target.value})} className="w-full p-3 rounded-xl bg-blue-50/50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-blue-200 outline-none">
-                            <option>Bebeu bem</option><option>Bebeu pouco</option><option>Recusou</option>
-                          </select>
-                        </div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
                       <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🛁 Cuidados e Bem-estar</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Água</label>
+                          <select value={routineData.agua} onChange={e => setRoutineData({...routineData, agua: e.target.value as any})} className="w-full p-3 rounded-xl bg-blue-50/50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-blue-200 outline-none">
+                            <option value="bebeu bastante">Bebeu bastante</option>
+                            <option value="bebeu pouco">Bebeu pouco</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Banho</label>
-                          <select value={routineData.banho} onChange={e => setRoutineData({...routineData, banho: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option>Sim</option><option>Não</option>
+                          <select value={routineData.banho} onChange={e => setRoutineData({...routineData, banho: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                            <option value="sim">Sim</option>
+                            <option value="não">Não</option>
+                            <option value="não se aplica">Não se aplica</option>
                           </select>
                         </div>
                         <div>
                           <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Evacuação</label>
-                          <select value={routineData.evacuacao} onChange={e => setRoutineData({...routineData, evacuacao: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option>Não</option><option>Sim</option>
+                          <select value={routineData.evacuacao} onChange={e => setRoutineData({...routineData, evacuacao: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                            <option value="sim">Sim</option>
+                            <option value="não">Não</option>
                           </select>
                         </div>
                         <div>
                           <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Fralda</label>
-                          <select value={routineData.fralda} onChange={e => setRoutineData({...routineData, fralda: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option>Seca</option><option>Molhada</option><option>Suja</option><option>1 troca</option><option>2 trocas</option>
+                          <select value={routineData.fralda} onChange={e => setRoutineData({...routineData, fralda: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                            <option value="1x">1x</option>
+                            <option value="2x">2x</option>
+                            <option value="3x">3x</option>
+                            <option value="não se aplica">Não se aplica</option>
                           </select>
                         </div>
                         <div>
                           <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Sono</label>
-                          <select value={routineData.sleep} onChange={e => setRoutineData({...routineData, sleep: e.target.value})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option>Dormiu bem</option><option>Agitado</option><option>Não dormiu</option>
+                          <select value={routineData.sleep} onChange={e => setRoutineData({...routineData, sleep: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                            <option value="dormiu">Dormiu</option>
+                            <option value="não dormiu">Não dormiu</option>
                           </select>
                         </div>
                         <div>
                           <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Humor</label>
                           <select value={routineData.mood} onChange={e => setRoutineData({...routineData, mood: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="happy">😊 Feliz</option><option value="calm">😌 Calmo</option><option value="fussy">😫 Agitado</option><option value="tired">😴 Cansado</option>
+                            <option value="happy">😊 Feliz</option>
+                            <option value="calm">😌 Calmo</option>
+                            <option value="fussy">😫 Agitado</option>
+                            <option value="tired">😴 Cansado</option>
                           </select>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🎨 Vivências</h4>
-                      <textarea placeholder="O que fizemos hoje? (ex: pintura, roda de música, parquinho...)" value={routineData.activities} onChange={e => setRoutineData({...routineData, activities: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
+                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🎨 Atividade do Dia</h4>
+                      <textarea placeholder="Relate as atividades realizadas..." value={routineData.activities} onChange={e => setRoutineData({...routineData, activities: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
                     </div>
                   </>
                 )}
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">📝 Observações e Recados</h4>
+                    <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">📝 Observações</h4>
                     <button type="button" onClick={handleAISummary} disabled={isGenerating} className="text-[8px] font-black text-white bg-orange-400 hover:bg-orange-500 px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md transition-all active:scale-95">
-                      {isGenerating ? 'IA Processando...' : 'Auto-Gerar Observação'}
+                      {isGenerating ? 'IA Processando...' : 'Gerar com IA'}
                     </button>
                   </div>
-                  <textarea placeholder="Algum recado importante para os pais?" value={routineData.observations} onChange={e => setRoutineData({...routineData, observations: e.target.value})} className="w-full p-4 rounded-2xl bg-orange-50/30 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
+                  <textarea placeholder="Recados para os pais..." value={routineData.observations} onChange={e => setRoutineData({...routineData, observations: e.target.value})} className="w-full p-4 rounded-2xl bg-orange-50/30 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
                 </div>
 
                 <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase text-xs tracking-[0.2em] transform transition-transform hover:scale-[1.01] active:scale-95">
-                  SALVAR REGISTRO DIÁRIO
+                  SALVAR NO SUPABASE
                 </button>
               </form>
             ) : (
               <div className="h-full flex flex-col items-center justify-center bg-white rounded-[3rem] card-shadow p-12 text-center border-2 border-dashed border-orange-100">
                 <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50">📋</div>
-                <h4 className="text-xl font-black text-gray-700">Escolha um Aluno</h4>
-                <p className="text-sm text-gray-400 font-medium max-w-xs mx-auto mt-2">Selecione uma criança na lista ao lado para preencher ou visualizar as atividades do dia.</p>
+                <h4 className="text-xl font-black text-gray-700">Selecione um Aluno</h4>
+                <p className="text-sm text-gray-400 font-medium max-w-xs mx-auto mt-2">Escolha uma criança para iniciar o diário.</p>
               </div>
             )}
           </div>
         </div>
       ) : activeView === 'planning' ? (
-        <form onSubmit={e => { e.preventDefault(); onSaveLessonPlan({...planData, grade: classes.find(c => c.id === planData.classId)?.name || '', shift: '', bnccCodes: '', structure: ''}); alert("Plano de aula enviado para aprovação!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-6 max-w-4xl mx-auto">
-          <h3 className="text-xl font-black text-gray-900">Novo Planejamento Pedagógico</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <input type="date" value={planData.date} onChange={e => setPlanData({...planData, date: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none" />
-             <input placeholder="Aula Nº" value={planData.lessonNumber} onChange={e => setPlanData({...planData, lessonNumber: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none" />
-             <select value={planData.classId} onChange={e => setPlanData({...planData, classId: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-               <option value="">Selecione a Turma...</option>
+        <form onSubmit={e => { 
+          e.preventDefault(); 
+          const cls = classes.find(c => c.id === planData.classId);
+          onSaveLessonPlan({
+            ...planData, 
+            grade: cls?.name || '', 
+            shift: '', 
+            objective: planData.objective,
+            structure: '',
+            assessment: planData.assessment,
+            materials: planData.materials
+          }); 
+          alert("Plano de aula enviado!"); 
+        }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-6 max-w-4xl mx-auto">
+          <h3 className="text-xl font-black text-gray-900">Planejamento Pedagógico</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+             <input type="date" value={planData.date} onChange={e => setPlanData({...planData, date: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black outline-none" />
+             <input placeholder="Nº Aula" value={planData.lessonNumber} onChange={e => setPlanData({...planData, lessonNumber: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black outline-none" />
+             <select value={planData.classId} onChange={e => setPlanData({...planData, classId: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black outline-none">
+               <option value="">Turma...</option>
                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
              </select>
+             <input placeholder="BNCC" value={planData.bnccCodes} onChange={e => setPlanData({...planData, bnccCodes: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black outline-none" />
           </div>
-          <textarea placeholder="Quais os objetivos pedagógicos, temas abordados e materiais necessários?" value={planData.content} onChange={e => setPlanData({...planData, content: e.target.value})} className="w-full p-6 rounded-[2rem] bg-gray-50 text-sm font-bold text-black min-h-[300px] border-transparent focus:ring-2 focus:ring-orange-200 outline-none resize-none shadow-inner" />
-          <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase tracking-widest text-xs">ENVIAR PARA COORDENAÇÃO</button>
+          <textarea placeholder="Objetivo" value={planData.objective} onChange={e => setPlanData({...planData, objective: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black min-h-[80px]" />
+          <textarea placeholder="Conteúdo da Aula" value={planData.content} onChange={e => setPlanData({...planData, content: e.target.value})} className="w-full p-6 rounded-[2rem] bg-gray-50 text-sm font-bold text-black min-h-[200px] outline-none" />
+          <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase tracking-widest text-xs">SUBMETER PLANO</button>
+
+          <div className="pt-8 space-y-4">
+             <h4 className="font-black text-gray-700 text-sm">Meus Últimos Planos</h4>
+             {lessonPlans.map(p => (
+               <div key={p.id} className="p-4 border rounded-2xl text-xs space-y-2">
+                 <div className="flex justify-between items-center">
+                   <span className="font-bold">{p.date} - Aula {p.lessonNumber}</span>
+                   <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>{p.status}</span>
+                 </div>
+                 {p.managerFeedback && <p className="p-2 bg-blue-50 text-blue-700 rounded-lg italic font-medium">Feedback: {p.managerFeedback}</p>}
+               </div>
+             ))}
+          </div>
         </form>
       ) : activeView === 'mural' ? (
         <div className="space-y-8 animate-in fade-in duration-500"><CreatePostForm onCreatePost={onCreatePost} /><FeedSection posts={posts} onLikePost={onLikePost} currentUserId={currentUserId} /></div>

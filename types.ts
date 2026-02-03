@@ -11,7 +11,7 @@ export interface User {
   email: string;
   role: UserRole;
   password?: string;
-  function?: string; // Função/Cargo específico para gestores
+  function?: string; 
 }
 
 export interface Class {
@@ -99,15 +99,15 @@ export interface RoutineEntry {
   studentId: string;
   date: string;
   attendance: 'present' | 'absent';
-  colacao: string;
-  almoco: string;
-  lanche: string;
-  janta: string;
-  banho: string;
-  agua: string;
-  evacuacao: string;
-  fralda: string;
-  sleep: string;
+  colacao: 'comeu tudo' | 'comeu bem' | 'comeu metade' | 'recusou' | 'não ofertado';
+  almoco: 'comeu tudo' | 'comeu bem' | 'comeu metade' | 'recusou' | 'não ofertado';
+  lanche: 'comeu tudo' | 'comeu bem' | 'comeu metade' | 'recusou' | 'não ofertado';
+  janta: 'comeu tudo' | 'comeu bem' | 'comeu metade' | 'recusou' | 'não ofertado';
+  banho: 'sim' | 'não' | 'não se aplica';
+  agua: 'bebeu bastante' | 'bebeu pouco';
+  evacuacao: 'sim' | 'não';
+  fralda: '1x' | '2x' | '3x' | 'não se aplica';
+  sleep: 'dormiu' | 'não dormiu';
   activities: string;
   observations: string;
   mood: 'happy' | 'calm' | 'fussy' | 'tired';
