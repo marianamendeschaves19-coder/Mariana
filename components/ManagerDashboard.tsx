@@ -20,6 +20,7 @@ interface ManagerDashboardProps {
   onUpdateClassTeacher: (classId: string, teacherId: string) => void;
   onDeleteClass: (id: string) => void;
   onAddStudent: (studentName: string, classId: string, guardianEmails: string) => void;
+  onUpdateStudent: (id: string, studentName: string, classId: string, guardianEmails: string) => void;
   onDeleteStudent: (id: string) => void;
   onAddUser: (name: string, email: string, role: UserRole, password?: string) => void;
   onDeleteUser: (id: string) => void;
@@ -38,7 +39,7 @@ interface ManagerDashboardProps {
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
   classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines,
-  onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onDeleteStudent, 
+  onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onUpdateStudent, onDeleteStudent, 
   onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
   onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, currentUserId
 }) => {
@@ -53,9 +54,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const [className, setClassName] = useState('');
   const [classTeacherId, setClassTeacherId] = useState('');
+  
+  // Alunos Form
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState('');
   const [targetClassId, setTargetClassId] = useState('');
   const [guardianEmails, setGuardianEmails] = useState('');
+
   const [tName, setTName] = useState('');
   const [tEmail, setTEmail] = useState('');
   const [tRole, setTRole] = useState<UserRole>(UserRole.TEACHER);
@@ -107,6 +112,23 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const handleApprovePlan = (pid: string) => {
     onApprovePlan(pid, planFeedback[pid] || '');
     alert("Visto aplicado com sucesso!");
+  };
+
+  const handleEditStudent = (s: Student) => {
+    setEditingStudentId(s.id);
+    setStudentName(s.name);
+    setTargetClassId(s.classId);
+    const emails = s.guardianIds.map(gid => users.find(u => u.id === gid)?.email).filter(Boolean).join(', ');
+    setGuardianEmails(emails);
+    // Smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const clearStudentForm = () => {
+    setEditingStudentId(null);
+    setStudentName('');
+    setTargetClassId('');
+    setGuardianEmails('');
   };
 
   const currentManager = users.find(u => u.id === currentUserId) || { id: currentUserId, name: 'Gestor', role: UserRole.MANAGER, email: '' };
@@ -213,15 +235,30 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           {/* Aba Alunos */}
           {activeTab === 'students' && (
             <div className="space-y-6 animate-in fade-in">
-              <form onSubmit={e => { e.preventDefault(); onAddStudent(studentName, targetClassId, guardianEmails); setStudentName(''); setTargetClassId(''); setGuardianEmails(''); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
-                <h3 className="text-xl font-black text-gray-900 leading-tight">🧒 Cadastro de Aluno</h3>
+              <form onSubmit={e => { 
+                e.preventDefault(); 
+                if (editingStudentId) {
+                  onUpdateStudent(editingStudentId, studentName, targetClassId, guardianEmails);
+                  alert("Aluno atualizado!");
+                } else {
+                  onAddStudent(studentName, targetClassId, guardianEmails);
+                  alert("Aluno cadastrado!");
+                }
+                clearStudentForm();
+              }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black text-gray-900 leading-tight">🧒 {editingStudentId ? 'Alterar Dados do Aluno' : 'Cadastro de Aluno'}</h3>
+                  {editingStudentId && <button type="button" onClick={clearStudentForm} className="text-[10px] font-black text-gray-400 uppercase hover:text-red-500">Cancelar Edição</button>}
+                </div>
                 <input required placeholder="Nome do Aluno" value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
                 <select required value={targetClassId} onChange={e => setTargetClassId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border">
                   <option value="">Selecione a Turma</option>
                   {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <input required placeholder="E-mails dos Pais (mais de um? separe por vírgula)" value={guardianEmails} onChange={e => setGuardianEmails(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
-                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase text-sm">CADASTRAR ALUNO</button>
+                <button type="submit" className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl uppercase text-sm">
+                  {editingStudentId ? 'ATUALIZAR DADOS' : 'CADASTRAR ALUNO'}
+                </button>
               </form>
 
               <div className="bg-white p-6 rounded-[2rem] border card-shadow overflow-x-auto">
@@ -231,7 +268,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         <th className="pb-4 px-2">Aluno</th>
                         <th className="pb-4 px-2">Turma</th>
                         <th className="pb-4 px-2">Responsáveis (E-mails)</th>
-                        <th className="pb-4 px-2">Ação</th>
+                        <th className="pb-4 px-2">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -243,7 +280,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                             {s.guardianIds.map(gid => users.find(u => u.id === gid)?.email).filter(Boolean).join(', ')}
                           </td>
                           <td className="py-4 px-2">
-                             <button onClick={() => onDeleteStudent(s.id)} className="text-red-500 font-bold">Excluir</button>
+                             <div className="flex gap-2">
+                               <button onClick={() => handleEditStudent(s)} className="text-blue-500 font-bold hover:underline" title="Editar">✏️ Editar</button>
+                               <button onClick={() => { if(confirm("Apagar aluno?")) onDeleteStudent(s.id); }} className="text-red-500 font-bold hover:underline" title="Excluir">🗑️ Excluir</button>
+                             </div>
                           </td>
                         </tr>
                       ))}
@@ -253,7 +293,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
           )}
 
-          {/* Aba Equipe (ATUALIZADA) */}
+          {/* Aba Equipe */}
           {activeTab === 'users' && (
             <div className="space-y-6 animate-in fade-in">
               <form onSubmit={e => { e.preventDefault(); onAddUser(tName, tEmail, tRole); setTName(''); setTEmail(''); alert("Usuário cadastrado com sucesso!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
@@ -302,7 +342,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
           )}
 
-          {/* Abas Mural, Chat, Eventos, Diário e Planejamento (Aprimorados) */}
+          {/* Outras Abas */}
           {activeTab === 'mural' && <div className="space-y-8 animate-in fade-in"><CreatePostForm onCreatePost={onCreatePost} /><FeedSection posts={posts} onLikePost={onLikePost} currentUserId={currentUserId} /></div>}
           {activeTab === 'chat' && (
             <ChatSection 

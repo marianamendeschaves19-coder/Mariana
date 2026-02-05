@@ -232,6 +232,18 @@ const App: React.FC = () => {
             await supabase.from('alunos').insert([{ nome: n, turma_id: c, responsavel_id: respId }]);
             fetchData();
           }}
+          onUpdateStudent={async (id, n, c, e) => {
+            const email = e.split(',')[0].trim().toLowerCase();
+            let respId = null;
+            const { data: ex } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
+            if (ex) respId = ex.id;
+            else {
+              const { data: nu } = await supabase.from('usuarios').insert([{ nome: `Família de ${n}`, email, tipo: 'responsavel', password: '123' }]).select().maybeSingle();
+              if (nu) respId = nu.id;
+            }
+            await supabase.from('alunos').update({ nome: n, turma_id: c, responsavel_id: respId }).eq('id', id);
+            fetchData();
+          }}
           onDeleteStudent={async id => { await supabase.from('alunos').delete().eq('id', id); fetchData(); }}
           onAddUser={async (n, e, r) => { await supabase.from('usuarios').insert([{ nome: n, email: e.toLowerCase(), tipo: mapUserRoleToDbRole(r), password: '123' }]); fetchData(); }}
           onDeleteUser={async id => { await supabase.from('usuarios').delete().eq('id', id); fetchData(); }}
