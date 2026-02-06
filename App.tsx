@@ -79,7 +79,8 @@ const App: React.FC = () => {
       setLessonPlans((dbPlans || []).map((p: any) => ({
         id: p.id, teacherId: p.professor_id, classId: p.turma_id, date: p.data, status: p.status, 
         content: p.conteudo_trabalhado, objective: p.objective, managerFeedback: p.manager_feedback, lessonNumber: p.lesson_number,
-        materials: p.materials, bnccCodes: p.bncc_codes
+        materials: p.materials, bnccCodes: p.bncc_codes, assessment: p.assessment, 
+        grade: dbClasses?.find((c:any) => c.id === p.turma_id)?.nome || ''
       } as any)));
 
       setPosts((dbPosts || []).map((p: any) => ({
@@ -282,7 +283,8 @@ const App: React.FC = () => {
               objective: pd.objective, 
               lesson_number: pd.lessonNumber,
               materials: pd.materials,
-              bncc_codes: pd.bnccCodes
+              bncc_codes: pd.bnccCodes,
+              assessment: pd.assessment
             };
             if ((pd as any).id) payload.id = (pd as any).id;
             

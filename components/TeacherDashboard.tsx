@@ -317,6 +317,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Objetivo de Aprendizagem</label>
                 <textarea placeholder="O que as crianças devem aprender?" value={planData.objective} onChange={e => setPlanData({...planData, objective: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black min-h-[80px] border outline-none focus:ring-2 focus:ring-orange-100" />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Recursos e Materiais</label>
+                  <textarea placeholder="Ex: Tinta guache, papel kraft..." value={planData.materials} onChange={e => setPlanData({...planData, materials: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black min-h-[100px] border outline-none focus:ring-2 focus:ring-orange-100" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Forma de Avaliação</label>
+                  <textarea placeholder="Ex: Observação direta, registro fotográfico..." value={planData.assessment} onChange={e => setPlanData({...planData, assessment: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black min-h-[100px] border outline-none focus:ring-2 focus:ring-orange-100" />
+                </div>
+              </div>
               <div>
                 <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Conteúdo e Desenvolvimento</label>
                 <textarea placeholder="Relate detalhadamente como será a aula..." value={planData.content} onChange={e => setPlanData({...planData, content: e.target.value})} className="w-full p-6 rounded-[2rem] bg-gray-50 text-sm font-bold text-black min-h-[200px] border outline-none focus:ring-2 focus:ring-orange-100" />
@@ -347,6 +357,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                            </span>
                          </div>
                          <h5 className="font-bold text-gray-800 text-sm line-clamp-1">{p.objective}</h5>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">{classes.find(c => c.id === p.classId)?.name}</p>
                        </div>
                        <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                          <button onClick={() => handleEditPlan(p)} className="p-2 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-100 transition-colors" title="Editar">✏️</button>

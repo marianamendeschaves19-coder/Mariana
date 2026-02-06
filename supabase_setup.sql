@@ -1,6 +1,6 @@
 
--- SCRIPT DE CONFIGURAÇÃO DEFINITIVA - AGENDA AQUARELA
--- Execute este script no SQL Editor do Supabase para limpar erros de cache (PGRST204)
+-- SCRIPT DE CONFIGURAÇÃO DEFINITIVA V2 - AGENDA AQUARELA
+-- Execute este script no SQL Editor do Supabase para garantir suporte total aos campos de planejamento
 
 -- 1. Limpeza Total
 DROP TABLE IF EXISTS public.mensagens CASCADE;
@@ -39,14 +39,14 @@ CREATE TABLE public.turmas (
 
 -- 5. Tabela de Alunos
 CREATE TABLE public.alunos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
     turma_id UUID REFERENCES public.turmas(id) ON DELETE SET NULL,
     responsavel_id UUID REFERENCES public.usuarios(id) ON DELETE SET NULL,
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. Tabela de Diário (Rotina) - COM COLUNA ATTENDANCE
+-- 6. Tabela de Diário (Rotina)
 CREATE TABLE public.diario_aluno (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     aluno_id UUID NOT NULL REFERENCES public.alunos(id) ON DELETE CASCADE,
@@ -68,7 +68,7 @@ CREATE TABLE public.diario_aluno (
     CONSTRAINT unique_diario_aluno_data UNIQUE (aluno_id, data)
 );
 
--- 7. Tabela Mural (Visível para todos)
+-- 7. Tabela Mural
 CREATE TABLE public.mural (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     author_id UUID REFERENCES public.usuarios(id) ON DELETE CASCADE,
@@ -77,8 +77,8 @@ CREATE TABLE public.mural (
     title TEXT,
     content TEXT,
     type TEXT DEFAULT 'general',
-    attachments JSONB DEFAULT '[]', -- Armazena array de anexos
-    likes UUID[] DEFAULT '{}', -- Array de IDs de usuários que curtiram
+    attachments JSONB DEFAULT '[]',
+    likes UUID[] DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -91,12 +91,28 @@ CREATE TABLE public.cardapio (
     CONSTRAINT unique_cardapio_data_refeicao UNIQUE (data, refeicao)
 );
 
--- 9. Outras Tabelas
+-- 9. Planejamento do Professor (TABELA ATUALIZADA)
+CREATE TABLE public.planejamento_professor (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    professor_id UUID REFERENCES public.usuarios(id) ON DELETE CASCADE,
+    turma_id UUID REFERENCES public.turmas(id) ON DELETE SET NULL,
+    data DATE NOT NULL,
+    lesson_number TEXT,
+    objective TEXT,
+    conteudo_trabalhado TEXT,
+    materials TEXT,
+    bncc_codes TEXT,
+    assessment TEXT,
+    status TEXT DEFAULT 'pending',
+    manager_feedback TEXT,
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 10. Outras Tabelas
 CREATE TABLE public.eventos (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT, date DATE, description TEXT, location TEXT);
-CREATE TABLE public.planejamento_professor (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), professor_id UUID REFERENCES public.usuarios(id), turma_id UUID REFERENCES public.turmas(id), data DATE, objective TEXT, conteudo_trabalhado TEXT, status TEXT DEFAULT 'pending', manager_feedback TEXT, lesson_number TEXT);
 CREATE TABLE public.mensagens (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), sender_id UUID REFERENCES public.usuarios(id), receiver_id UUID REFERENCES public.usuarios(id), content TEXT, timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW());
 
--- 10. Desabilitar RLS para Protótipo
+-- 11. Desabilitar RLS para Protótipo
 ALTER TABLE public.usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.turmas DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alunos DISABLE ROW LEVEL SECURITY;
@@ -107,10 +123,9 @@ ALTER TABLE public.eventos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.planejamento_professor DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mensagens DISABLE ROW LEVEL SECURITY;
 
--- 11. Usuários de Teste
+-- 12. Dados Iniciais
 INSERT INTO public.usuarios (nome, email, tipo, password) 
 VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123')
 ON CONFLICT (email) DO UPDATE SET password = '123';
 
--- 12. FORÇAR RECARGA DO SCHEMA (Resolve PGRST204)
 NOTIFY pgrst, 'reload schema';
