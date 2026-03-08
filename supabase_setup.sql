@@ -68,6 +68,19 @@ CREATE TABLE public.diario_aluno (
     CONSTRAINT unique_diario_aluno_data UNIQUE (aluno_id, data)
 );
 
+-- 6.1 Tabela de Registros Granulares (Logs)
+CREATE TABLE public.registros_rotina (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID NOT NULL REFERENCES public.alunos(id) ON DELETE CASCADE,
+    professor_id UUID NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
+    professor_nome TEXT NOT NULL,
+    categoria TEXT NOT NULL,
+    conteudo TEXT NOT NULL,
+    data DATE NOT NULL DEFAULT CURRENT_DATE,
+    horario TIME NOT NULL DEFAULT CURRENT_TIME,
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 7. Tabela Mural
 CREATE TABLE public.mural (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

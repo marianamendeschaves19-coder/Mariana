@@ -114,4 +114,16 @@ export interface RoutineEntry {
   authorId: string;
 }
 
+export interface RoutineLog {
+  id: string;
+  studentId: string;
+  teacherId: string;
+  teacherName: string;
+  category: 'Alimentação' | 'Sono' | 'Troca / Higiene' | 'Atividade pedagógica' | 'Recreação' | 'Observação';
+  content: string;
+  date: string;
+  time: string;
+  createdAt: string;
+}
+
 export type ViewState = 'LOGIN' | 'SIGNUP' | 'DASHBOARD';

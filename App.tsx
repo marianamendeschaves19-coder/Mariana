@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Class, Student, RoutineEntry, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
+import { User, UserRole, Class, Student, RoutineEntry, RoutineLog, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
 import Layout from './components/Layout';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [routines, setRoutines] = useState<RoutineEntry[]>([]);
+  const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -51,6 +52,7 @@ const App: React.FC = () => {
       const { data: dbClasses } = await supabase.from('turmas').select('*');
       const { data: dbStudents } = await supabase.from('alunos').select('*');
       const { data: dbRoutines } = await supabase.from('diario_aluno').select('*');
+      const { data: dbLogs } = await supabase.from('registros_rotina').select('*');
       const { data: dbPlans } = await supabase.from('planejamento_professor').select('*');
       const { data: dbPosts } = await supabase.from('mural').select('*');
       const { data: dbEvents } = await supabase.from('eventos').select('*');
@@ -74,6 +76,11 @@ const App: React.FC = () => {
         attendance: r.attendance || 'present', observations: r.observacoes_professor || '',
         activities: r.atividades || '', colacao: r.colacao, almoco: r.almoco, lanche: r.lanche, janta: r.janta,
         banho: r.banho, sleep: r.sleep, evacuacao: r.evacuacao, fralda: r.fralda, agua: r.agua
+      } as any)));
+
+      setRoutineLogs((dbLogs || []).map((l: any) => ({
+        id: l.id, studentId: l.aluno_id, teacherId: l.professor_id, teacherName: l.professor_nome,
+        category: l.categoria, content: l.conteudo, date: l.data, time: l.horario, createdAt: l.criado_em
       } as any)));
 
       setLessonPlans((dbPlans || []).map((p: any) => ({
@@ -154,6 +161,20 @@ const App: React.FC = () => {
     
     const { error } = await supabase.from('diario_aluno').upsert([dbPayload], { onConflict: 'aluno_id, data' });
     if (error) alert("Erro ao salvar diário: " + error.message);
+    else fetchData();
+  };
+
+  const handleSaveRoutineLog = async (log: Omit<RoutineLog, 'id' | 'createdAt'>) => {
+    const { error } = await supabase.from('registros_rotina').insert([{
+      aluno_id: log.studentId,
+      professor_id: log.teacherId,
+      professor_nome: log.teacherName,
+      categoria: log.category,
+      conteudo: log.content,
+      data: log.date,
+      horario: log.time
+    }]);
+    if (error) alert("Erro ao salvar registro: " + error.message);
     else fetchData();
   };
 
@@ -267,13 +288,17 @@ const App: React.FC = () => {
           onUpdateChatConfig={setChatConfig}
           onApprovePlan={async (pid, f) => { await supabase.from('planejamento_professor').update({ status: 'approved', manager_feedback: f }).eq('id', pid); fetchData(); }}
           onSaveRoutine={handleSaveRoutine}
+          routineLogs={routineLogs}
+          onSaveRoutineLog={handleSaveRoutineLog}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
         <TeacherDashboard 
-          classes={classes.filter(c => c.teacherId === currentUser.id)} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
+          classes={classes} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
           posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
+          routineLogs={routineLogs}
           onSaveRoutine={handleSaveRoutine} 
+          onSaveRoutineLog={handleSaveRoutineLog}
           onSaveLessonPlan={async pd => { 
             const payload: any = { 
               professor_id: currentUser.id, 
@@ -304,7 +329,7 @@ const App: React.FC = () => {
       )}
       {currentUser.role === UserRole.GUARDIAN && (
         <GuardianDashboard 
-          students={students.filter(s => s.guardianIds.includes(currentUser.id))} routines={routines} posts={posts} messages={messages} 
+          students={students.filter(s => s.guardianIds.includes(currentUser.id))} routines={routines} routineLogs={routineLogs} posts={posts} messages={messages} 
           chatConfig={chatConfig} classes={classes} users={users} events={events} menus={menus} currentUserId={currentUser.id}
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await supabase.from('mensagens').insert([{ sender_id: currentUser.id, receiver_id: r, content: c }]); fetchData(); }} 

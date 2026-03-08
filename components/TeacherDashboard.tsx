@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Class, Student, RoutineEntry, LessonPlan, FeedPost, ChatMessage, ChatConfig, User, UserRole } from '../types';
+import { Class, Student, RoutineEntry, RoutineLog, LessonPlan, FeedPost, ChatMessage, ChatConfig, User, UserRole } from '../types';
 import CreatePostForm from './CreatePostForm';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
@@ -15,7 +15,9 @@ interface TeacherDashboardProps {
   chatConfig: ChatConfig;
   users: User[];
   routines: RoutineEntry[];
+  routineLogs: RoutineLog[];
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
+  onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
   onSaveLessonPlan: (plan: Omit<LessonPlan, 'id' | 'status' | 'createdAt' | 'teacherId'>) => void;
   onDeleteLessonPlan: (id: string) => void;
   onCreatePost: (post: any) => void;
@@ -25,12 +27,14 @@ interface TeacherDashboardProps {
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-  classes, students, lessonPlans, posts, messages, chatConfig, users, routines,
-  onSaveRoutine, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId 
+  classes, students, lessonPlans, posts, messages, chatConfig, users, routines, routineLogs,
+  onSaveRoutine, onSaveRoutineLog, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId 
 }) => {
   const [activeView, setActiveView] = useState<'routines' | 'planning' | 'mural' | 'chat'>('routines');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [logContent, setLogContent] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<RoutineLog['category'] | null>(null);
 
   // Estados de Planejamento
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -88,7 +92,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     e.preventDefault();
     if (!selectedStudent) return;
     onSaveRoutine({ ...routineData, studentId: selectedStudent.id, authorId: currentUserId });
-    alert(`Diário de ${selectedStudent.name} salvo com sucesso!`);
+    alert(`Status diário de ${selectedStudent.name} salvo com sucesso!`);
+  };
+
+  const handleSaveLog = () => {
+    if (!selectedStudent || !selectedCategory || !logContent.trim()) return;
+    
+    const now = new Date();
+    const date = now.toISOString().split('T')[0];
+    const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const teacher = users.find(u => u.id === currentUserId);
+
+    onSaveRoutineLog({
+      studentId: selectedStudent.id,
+      teacherId: currentUserId,
+      teacherName: teacher?.name || 'Professor(a)',
+      category: selectedCategory,
+      content: logContent,
+      date,
+      time
+    });
+
+    setLogContent('');
+    setSelectedCategory(null);
   };
 
   const handleAISummary = async () => {
@@ -132,7 +158,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       {activeView === 'routines' ? (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="bg-white p-6 rounded-[2rem] card-shadow space-y-4 lg:col-span-1">
-             <h3 className="font-black text-gray-800 text-[10px] uppercase tracking-widest mb-4">Minhas Turmas</h3>
+             <h3 className="font-black text-gray-800 text-[10px] uppercase tracking-widest mb-4">Todas as Turmas</h3>
              {classes.map(cls => (
                <div key={cls.id} className="space-y-2">
                  <h4 className="text-[10px] font-black text-orange-400 uppercase bg-orange-50 px-3 py-1 rounded-full w-fit">{cls.name}</h4>
@@ -147,115 +173,124 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                </div>
              ))}
           </div>
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 space-y-6">
             {selectedStudent ? (
-              <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow space-y-8 border border-orange-50 animate-in fade-in slide-in-from-right-4">
-                <div className="flex justify-between items-center border-b pb-4">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                {/* Cabeçalho do Aluno */}
+                <div className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-50 flex justify-between items-center">
                   <div>
                     <h3 className="text-xl font-black text-gray-900 leading-tight">Agenda de {selectedStudent.name}</h3>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Registros em tempo real</p>
                   </div>
-                  <input type="date" value={routineData.date} onChange={e => setRoutineData({...routineData, date: e.target.value})} className="text-xs font-bold text-orange-600 bg-orange-50 px-4 py-2 rounded-full border-transparent outline-none focus:ring-2 focus:ring-orange-200" />
+                  <div className="text-right">
+                    <p className="text-xs font-black text-orange-500">{new Date().toLocaleDateString('pt-BR')}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase">Hoje</p>
+                  </div>
                 </div>
 
-                <div className="flex bg-gray-50 p-1 rounded-2xl w-fit">
-                   <button type="button" onClick={() => setRoutineData({...routineData, attendance: 'present'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${routineData.attendance === 'present' ? 'bg-green-500 text-white shadow-md' : 'text-gray-400'}`}>Presente</button>
-                   <button type="button" onClick={() => setRoutineData({...routineData, attendance: 'absent'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${routineData.attendance === 'absent' ? 'bg-red-500 text-white shadow-md' : 'text-gray-400'}`}>Faltou</button>
+                {/* Botões Rápidos de Registro */}
+                <div className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-6">
+                  <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🚀 Registro Rápido</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {[
+                      { id: 'Alimentação', icon: '🍎' },
+                      { id: 'Sono', icon: '😴' },
+                      { id: 'Troca / Higiene', icon: '🧼' },
+                      { id: 'Atividade pedagógica', icon: '🎨' },
+                      { id: 'Recreação', icon: '⚽' },
+                      { id: 'Observação', icon: '📝' }
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.id as any)}
+                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-2 ${selectedCategory === cat.id ? 'border-orange-500 bg-orange-50 scale-105 shadow-md' : 'border-gray-50 hover:border-orange-200 bg-gray-50/50'}`}
+                      >
+                        <span className="text-2xl">{cat.icon}</span>
+                        <span className="text-[9px] font-black uppercase text-center leading-tight">{cat.id}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedCategory && (
+                    <div className="space-y-4 animate-in zoom-in-95 duration-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-orange-600 bg-orange-100 px-3 py-1 rounded-full uppercase">Novo registro: {selectedCategory}</span>
+                        <button onClick={() => setSelectedCategory(null)} className="text-[9px] font-black text-gray-400 uppercase hover:text-red-500">Cancelar</button>
+                      </div>
+                      <textarea
+                        placeholder={`Descreva aqui o registro de ${selectedCategory.toLowerCase()}...`}
+                        value={logContent}
+                        onChange={e => setLogContent(e.target.value)}
+                        className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner"
+                      />
+                      <button
+                        onClick={handleSaveLog}
+                        disabled={!logContent.trim()}
+                        className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest disabled:opacity-50 disabled:scale-100 transition-all active:scale-95"
+                      >
+                        CONFIRMAR REGISTRO
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {routineData.attendance === 'present' && (
-                  <>
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🍎 Alimentação</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
-                          <div key={field}>
-                            <label className="text-[9px] font-black text-gray-400 uppercase ml-1">{field}</label>
-                            <select value={(routineData as any)[field.toLowerCase()]} onChange={e => setRoutineData({...routineData, [field.toLowerCase()]: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                              <option value="comeu tudo">Comeu tudo</option>
-                              <option value="comeu bem">Comeu bem</option>
-                              <option value="comeu metade">Comeu metade</option>
-                              <option value="recusou">Recusou</option>
-                              <option value="não ofertado">Não ofertado</option>
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🛁 Cuidados e Bem-estar</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Água</label>
-                          <select value={routineData.agua} onChange={e => setRoutineData({...routineData, agua: e.target.value as any})} className="w-full p-3 rounded-xl bg-blue-50/50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-blue-200 outline-none">
-                            <option value="bebeu bastante">Bebeu bastante</option>
-                            <option value="bebeu pouco">Bebeu pouco</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Banho</label>
-                          <select value={routineData.banho} onChange={e => setRoutineData({...routineData, banho: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="sim">Sim</option>
-                            <option value="não">Não</option>
-                            <option value="não se aplica">Não se aplica</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Evacuação</label>
-                          <select value={routineData.evacuacao} onChange={e => setRoutineData({...routineData, evacuacao: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="sim">Sim</option>
-                            <option value="não">Não</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Fralda</label>
-                          <select value={routineData.fralda} onChange={e => setRoutineData({...routineData, fralda: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="1x">1x</option>
-                            <option value="2x">2x</option>
-                            <option value="3x">3x</option>
-                            <option value="não se aplica">Não se aplica</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Sono</label>
-                          <select value={routineData.sleep} onChange={e => setRoutineData({...routineData, sleep: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="dormiu">Dormiu</option>
-                            <option value="não dormiu">Não dormiu</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Humor</label>
-                          <select value={routineData.mood} onChange={e => setRoutineData({...routineData, mood: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
-                            <option value="happy">😊 Feliz</option>
-                            <option value="calm">😌 Calmo</option>
-                            <option value="fussy">😫 Agitado</option>
-                            <option value="tired">😴 Cansado</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🎨 Atividade do Dia</h4>
-                      <textarea placeholder="Relate as atividades realizadas..." value={routineData.activities} onChange={e => setRoutineData({...routineData, activities: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
-                    </div>
-                  </>
-                )}
-
+                {/* Histórico de Registros do Dia */}
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">📝 Observações</h4>
-                    <button type="button" onClick={handleAISummary} disabled={isGenerating} className="text-[8px] font-black text-white bg-orange-400 hover:bg-orange-500 px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md transition-all active:scale-95">
-                      {isGenerating ? 'IA Processando...' : 'Gerar com IA'}
-                    </button>
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Linha do Tempo (Hoje)</h4>
+                  <div className="space-y-4">
+                    {routineLogs
+                      .filter(l => l.studentId === selectedStudent.id && l.date === new Date().toISOString().split('T')[0])
+                      .sort((a, b) => b.time.localeCompare(a.time))
+                      .map(log => (
+                        <div key={log.id} className="bg-white p-5 rounded-[1.5rem] card-shadow border border-orange-50 flex gap-4 animate-in fade-in slide-in-from-bottom-2">
+                          <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                            <span className="text-xs font-black text-orange-500">{log.time}</span>
+                            <div className="w-0.5 h-full bg-orange-100 rounded-full"></div>
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex justify-between items-start">
+                              <span className="text-[9px] font-black text-white bg-orange-400 px-2 py-0.5 rounded uppercase tracking-widest">{log.category}</span>
+                              <span className="text-[8px] font-bold text-gray-400 uppercase">Por: {log.teacherName}</span>
+                            </div>
+                            <p className="text-sm font-bold text-gray-800 leading-relaxed">{log.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                    {routineLogs.filter(l => l.studentId === selectedStudent.id && l.date === new Date().toISOString().split('T')[0]).length === 0 && (
+                      <div className="bg-white/50 p-8 rounded-[2rem] border-2 border-dashed border-gray-200 text-center">
+                        <p className="text-xs font-bold text-gray-400 uppercase italic">Nenhum registro realizado hoje ainda.</p>
+                      </div>
+                    )}
                   </div>
-                  <textarea placeholder="Recados para os pais..." value={routineData.observations} onChange={e => setRoutineData({...routineData, observations: e.target.value})} className="w-full p-4 rounded-2xl bg-orange-50/30 text-sm font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none min-h-[100px] resize-none shadow-inner" />
                 </div>
 
-                <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase text-xs tracking-[0.2em] transform transition-transform hover:scale-[1.01] active:scale-95">
-                  SALVAR DIÁRIO
-                </button>
-              </form>
+                {/* Status Geral (Presença e Humor) */}
+                <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow space-y-6 border border-orange-50">
+                  <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">📍 Status Geral do Dia</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Presença</label>
+                      <div className="flex bg-gray-50 p-1 rounded-2xl w-fit">
+                        <button type="button" onClick={() => setRoutineData({...routineData, attendance: 'present'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${routineData.attendance === 'present' ? 'bg-green-500 text-white shadow-md' : 'text-gray-400'}`}>Presente</button>
+                        <button type="button" onClick={() => setRoutineData({...routineData, attendance: 'absent'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${routineData.attendance === 'absent' ? 'bg-red-500 text-white shadow-md' : 'text-gray-400'}`}>Faltou</button>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Humor Predominante</label>
+                      <select value={routineData.mood} onChange={e => setRoutineData({...routineData, mood: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border-transparent focus:ring-2 focus:ring-orange-200 outline-none">
+                        <option value="happy">😊 Feliz</option>
+                        <option value="calm">😌 Calmo</option>
+                        <option value="fussy">😫 Agitado</option>
+                        <option value="tired">😴 Cansado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-gray-800 text-white font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest hover:bg-black transition-all">
+                    ATUALIZAR STATUS DO DIA
+                  </button>
+                </form>
+              </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center bg-white rounded-[3rem] card-shadow p-12 text-center border-2 border-dashed border-orange-100">
                 <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50">📋</div>

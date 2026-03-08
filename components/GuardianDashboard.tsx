@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { Student, RoutineEntry, FeedPost, ChatMessage, ChatConfig, User, UserRole, Class, SchoolEvent, SchoolMenu } from '../types';
+import { Student, RoutineEntry, RoutineLog, FeedPost, ChatMessage, ChatConfig, User, UserRole, Class, SchoolEvent, SchoolMenu } from '../types';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
 
 interface GuardianDashboardProps {
   students: Student[];
   routines: RoutineEntry[];
+  routineLogs: RoutineLog[];
   posts: FeedPost[];
   messages: ChatMessage[];
   chatConfig: ChatConfig;
@@ -20,7 +21,7 @@ interface GuardianDashboardProps {
 }
 
 const GuardianDashboard: React.FC<GuardianDashboardProps> = ({ 
-  students, routines, posts, messages, chatConfig, classes, users, events, menus,
+  students, routines, routineLogs, posts, messages, chatConfig, classes, users, events, menus,
   onLikePost, onSendMessage, currentUserId 
 }) => {
   const [activeTab, setActiveTab] = useState<'routines' | 'menu' | 'events' | 'mural' | 'chat'>('routines');
@@ -147,6 +148,33 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
                        <span className="bg-orange-100 text-orange-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
                         {getMoodEmoji(routine.mood)}
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Linha do Tempo de Registros */}
+                  <div className="space-y-4">
+                    <h5 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1">🕒 Linha do Tempo</h5>
+                    <div className="space-y-4">
+                      {routineLogs
+                        .filter(l => l.studentId === selectedChild?.id && l.date === routine.date)
+                        .sort((a, b) => b.time.localeCompare(a.time))
+                        .map(log => (
+                          <div key={log.id} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 flex gap-4">
+                            <div className="text-center min-w-[50px]">
+                              <p className="text-[10px] font-black text-orange-500">{log.time}</p>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-[8px] font-black text-white bg-orange-400 px-2 py-0.5 rounded uppercase">{log.category}</span>
+                                <span className="text-[7px] font-bold text-gray-400 uppercase">Prof(a). {log.teacherName}</span>
+                              </div>
+                              <p className="text-xs font-bold text-gray-700">{log.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      {routineLogs.filter(l => l.studentId === selectedChild?.id && l.date === routine.date).length === 0 && (
+                        <p className="text-[10px] text-gray-400 italic text-center py-2">Nenhum registro detalhado para este dia.</p>
+                      )}
                     </div>
                   </div>
 

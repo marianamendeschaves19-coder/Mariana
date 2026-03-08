@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Class, Student, User, UserRole, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu, RoutineEntry } from '../types';
+import { Class, Student, User, UserRole, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu, RoutineEntry, RoutineLog } from '../types';
 import CreatePostForm from './CreatePostForm';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
@@ -16,6 +16,7 @@ interface ManagerDashboardProps {
   events: SchoolEvent[];
   menus: SchoolMenu[];
   routines: RoutineEntry[];
+  routineLogs: RoutineLog[];
   onAddClass: (name: string, teacherId: string) => void;
   onUpdateClassTeacher: (classId: string, teacherId: string) => void;
   onDeleteClass: (id: string) => void;
@@ -34,14 +35,15 @@ interface ManagerDashboardProps {
   onSendMessage: (content: string, receiverId: string) => void;
   onUpdateChatConfig: (config: ChatConfig) => void;
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
+  onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
   currentUserId: string;
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
-  classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines,
+  classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines, routineLogs,
   onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onUpdateStudent, onDeleteStudent, 
   onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
-  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, currentUserId
+  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onSaveRoutineLog, currentUserId
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
   
@@ -415,20 +417,46 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 <input type="date" value={routineData.date} onChange={e => setRoutineData({...routineData, date: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
               </div>
               {selectedRoutineStudent && (
-                 <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-6">
-                    <h3 className="text-lg font-black text-gray-900 leading-tight">Revisão do Diário: {selectedRoutineStudent.name}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
-                          <div key={field}>
-                            <label className="text-[9px] font-black text-gray-400 uppercase">{field}</label>
-                            <select value={(routineData as any)[field.toLowerCase()]} onChange={e => setRoutineData({...routineData, [field.toLowerCase()]: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border">
-                                <option value="comeu tudo">Comeu tudo</option><option value="comeu bem">Comeu bem</option><option value="comeu metade">Comeu metade</option><option value="recusou">Recusou</option><option value="não ofertado">Não ofertado</option>
-                            </select>
-                          </div>
-                        ))}
-                    </div>
-                    <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">SALVAR ALTERAÇÕES NO DIÁRIO</button>
-                 </form>
+                 <div className="space-y-6">
+                   <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-6">
+                      <h3 className="text-lg font-black text-gray-900 leading-tight">Revisão do Diário: {selectedRoutineStudent.name}</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
+                            <div key={field}>
+                              <label className="text-[9px] font-black text-gray-400 uppercase">{field}</label>
+                              <select value={(routineData as any)[field.toLowerCase()]} onChange={e => setRoutineData({...routineData, [field.toLowerCase()]: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border">
+                                  <option value="comeu tudo">Comeu tudo</option><option value="comeu bem">Comeu bem</option><option value="comeu metade">Comeu metade</option><option value="recusou">Recusou</option><option value="não ofertado">Não ofertado</option>
+                              </select>
+                            </div>
+                          ))}
+                      </div>
+                      <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">SALVAR ALTERAÇÕES NO DIÁRIO</button>
+                   </form>
+
+                   <div className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🕒 Registros do Dia</h4>
+                      <div className="space-y-3">
+                        {routineLogs
+                          .filter(l => l.studentId === selectedRoutineStudent.id && l.date === routineData.date)
+                          .sort((a, b) => b.time.localeCompare(a.time))
+                          .map(log => (
+                            <div key={log.id} className="p-4 bg-gray-50 rounded-2xl border flex justify-between items-start text-xs">
+                              <div className="space-y-1">
+                                <div className="flex gap-2 items-center">
+                                  <span className="font-black text-orange-500">{log.time}</span>
+                                  <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded text-[8px] font-black uppercase">{log.category}</span>
+                                </div>
+                                <p className="font-bold text-gray-700">{log.content}</p>
+                                <p className="text-[8px] text-gray-400 uppercase">Por: {log.teacherName}</p>
+                              </div>
+                            </div>
+                          ))}
+                        {routineLogs.filter(l => l.studentId === selectedRoutineStudent.id && l.date === routineData.date).length === 0 && (
+                          <p className="text-xs text-gray-400 italic text-center py-4">Nenhum registro detalhado para esta data.</p>
+                        )}
+                      </div>
+                   </div>
+                 </div>
               )}
             </div>
           )}
