@@ -268,7 +268,34 @@ const App: React.FC = () => {
           }}
           onDeleteStudent={async id => { await supabase.from('alunos').delete().eq('id', id); fetchData(); }}
           onAddUser={async (n, e, r) => { await supabase.from('usuarios').insert([{ nome: n, email: e.toLowerCase(), tipo: mapUserRoleToDbRole(r), password: '123' }]); fetchData(); }}
-          onDeleteUser={async id => { await supabase.from('usuarios').delete().eq('id', id); fetchData(); }}
+          onDeleteUser={async id => {
+            const user = users.find(u => u.id === id);
+            if (!user) return;
+            
+            const confirmMsg = user.role === UserRole.TEACHER 
+              ? `ATENÇÃO: Deseja excluir o(a) professor(a) ${user.name}? \n\nIsso apagará permanentemente todos os seus planejamentos, registros de rotina e mensagens. Esta ação não pode ser desfeita.`
+              : `Deseja excluir o usuário ${user.name}?`;
+
+            if (confirm(confirmMsg)) {
+              try {
+                // Limpeza manual de mensagens (pois não tem CASCADE no banco)
+                await supabase.from('mensagens').delete().or(`sender_id.eq.${id},receiver_id.eq.${id}`);
+                
+                // Deletar o usuário. O CASCADE do banco cuidará de:
+                // - registros_rotina (professor_id)
+                // - mural (author_id)
+                // - planejamento_professor (professor_id)
+                const { error } = await supabase.from('usuarios').delete().eq('id', id);
+                
+                if (error) throw error;
+                
+                alert("Usuário e dados associados excluídos com sucesso.");
+                fetchData();
+              } catch (err: any) {
+                alert("Erro ao excluir usuário: " + err.message);
+              }
+            }
+          }}
           onAddEvent={async ev => { await supabase.from('eventos').insert([ev]); fetchData(); }}
           onDeleteEvent={async id => { await supabase.from('eventos').delete().eq('id', id); fetchData(); }}
           onAddMenu={async m => { 
