@@ -278,20 +278,29 @@ const App: React.FC = () => {
 
             if (confirm(confirmMsg)) {
               try {
-                // Limpeza manual de mensagens (pois não tem CASCADE no banco)
+                // 1. Limpeza de mensagens (enviadas ou recebidas)
                 await supabase.from('mensagens').delete().or(`sender_id.eq.${id},receiver_id.eq.${id}`);
                 
-                // Deletar o usuário. O CASCADE do banco cuidará de:
-                // - registros_rotina (professor_id)
-                // - mural (author_id)
-                // - planejamento_professor (professor_id)
+                // 2. Limpeza de registros pedagógicos e rotina (Professor)
+                if (user.role === UserRole.TEACHER) {
+                  // Remover planejamentos
+                  await supabase.from('planejamento_professor').delete().eq('professor_id', id);
+                  
+                  // Remover logs de rotina
+                  await supabase.from('registros_rotina').delete().eq('professor_id', id);
+                  
+                  // Remover postagens no mural
+                  await supabase.from('mural').delete().eq('author_id', id);
+                  
+
                 const { error } = await supabase.from('usuarios').delete().eq('id', id);
                 
                 if (error) throw error;
                 
-                alert("Usuário e dados associados excluídos com sucesso.");
+                alert("Usuário e todos os seus dados vinculados foram excluídos com sucesso.");
                 fetchData();
               } catch (err: any) {
+                console.error("Erro detalhado na exclusão:", err);
                 alert("Erro ao excluir usuário: " + err.message);
               }
             }

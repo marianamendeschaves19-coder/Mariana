@@ -4,7 +4,7 @@ import { Class, Student, RoutineEntry, RoutineLog, LessonPlan, FeedPost, ChatMes
 import CreatePostForm from './CreatePostForm';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
-import { generateRoutineSummary } from '../services/geminiService';
+import { generateRoutineSummary, suggestBNCC } from '../services/geminiService';
 
 interface TeacherDashboardProps {
   classes: Class[];
@@ -33,6 +33,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [activeView, setActiveView] = useState<'routines' | 'planning' | 'mural' | 'chat'>('routines');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSuggestingBNCC, setIsSuggestingBNCC] = useState(false);
   const [logContent, setLogContent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<RoutineLog['category'] | null>(null);
 
@@ -122,6 +123,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const summary = await generateRoutineSummary(routineData.activities || "interação e aprendizado");
     setRoutineData(prev => ({ ...prev, observations: summary }));
     setIsGenerating(false);
+  };
+
+  const handleSuggestBNCC = async () => {
+    if (!planData.objective && !planData.content) {
+      alert("Preencha o objetivo ou conteúdo para receber sugestões.");
+      return;
+    }
+    setIsSuggestingBNCC(true);
+    const suggestion = await suggestBNCC(planData.objective, planData.content);
+    if (suggestion) {
+      setPlanData(prev => ({ ...prev, bnccCodes: suggestion }));
+    }
+    setIsSuggestingBNCC(false);
   };
 
   const handleEditPlan = (plan: LessonPlan) => {
@@ -342,7 +356,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   </select>
                </div>
                <div>
-                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Código BNCC</label>
+                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1 flex justify-between">
+                    Código BNCC
+                    <button 
+                      type="button" 
+                      onClick={handleSuggestBNCC}
+                      disabled={isSuggestingBNCC}
+                      className="text-orange-500 hover:text-orange-600 disabled:opacity-50"
+                    >
+                      {isSuggestingBNCC ? 'Sugerindo...' : '✨ Sugerir'}
+                    </button>
+                  </label>
                   <input placeholder="Ex: EI03EO01" value={planData.bnccCodes} onChange={e => setPlanData({...planData, bnccCodes: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold text-black outline-none border" />
                </div>
             </div>

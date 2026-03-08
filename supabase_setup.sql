@@ -39,7 +39,7 @@ CREATE TABLE public.turmas (
 
 -- 5. Tabela de Alunos
 CREATE TABLE public.alunos (
-    id PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
     turma_id UUID REFERENCES public.turmas(id) ON DELETE SET NULL,
     responsavel_id UUID REFERENCES public.usuarios(id) ON DELETE SET NULL,
