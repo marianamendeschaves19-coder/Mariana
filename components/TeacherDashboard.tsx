@@ -19,7 +19,7 @@ interface TeacherDashboardProps {
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
   onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
   onSaveLessonPlan: (plan: Omit<LessonPlan, 'id' | 'status' | 'createdAt' | 'teacherId'>) => void;
-  onDeleteLessonPlan: (id: string) => void;
+  onDeleteLessonPlan: (id: string, status?: string) => void;
   onCreatePost: (post: any) => void;
   onLikePost: (postId: string) => void;
   onSendMessage: (content: string, receiverId: string) => void;
@@ -368,9 +368,26 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               </div>
             </div>
             
-            <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase tracking-widest text-xs">
-              {editingPlanId ? 'ATUALIZAR PLANEJAMENTO' : 'SUBMETER PARA APROVAÇÃO'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button type="submit" className="flex-1 py-5 gradient-aquarela text-white font-black rounded-[2rem] shadow-xl uppercase tracking-widest text-xs">
+                {editingPlanId ? 'ATUALIZAR PLANEJAMENTO' : 'SUBMETER PARA APROVAÇÃO'}
+              </button>
+              {editingPlanId && (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const plan = lessonPlans.find(p => p.id === editingPlanId);
+                    if (plan) {
+                      onDeleteLessonPlan(editingPlanId, plan.status);
+                      clearPlanForm();
+                    }
+                  }} 
+                  className="py-5 px-8 bg-red-50 text-red-500 font-black rounded-[2rem] border border-red-100 uppercase tracking-widest text-xs hover:bg-red-500 hover:text-white transition-all"
+                >
+                  EXCLUIR PLANO
+                </button>
+              )}
+            </div>
           </form>
 
           <div className="space-y-4">
@@ -396,7 +413,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                        </div>
                        <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                          <button onClick={() => handleEditPlan(p)} className="p-2 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-100 transition-colors" title="Editar">✏️</button>
-                         <button onClick={() => onDeleteLessonPlan(p.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Apagar">🗑️</button>
+                         <button onClick={() => onDeleteLessonPlan(p.id, p.status)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Apagar">🗑️</button>
                        </div>
                      </div>
                      {p.managerFeedback && (

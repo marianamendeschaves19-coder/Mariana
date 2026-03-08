@@ -343,8 +343,11 @@ const App: React.FC = () => {
             await supabase.from('planejamento_professor').upsert([payload]); 
             fetchData(); 
           }}
-          onDeleteLessonPlan={async id => {
-            if (confirm("Tem certeza que deseja apagar este plano de aula?")) {
+          onDeleteLessonPlan={async (id, status) => {
+            const msg = status === 'approved' 
+              ? "Este planejamento já recebeu o visto do gestor. Tem certeza que deseja excluí-lo permanentemente?"
+              : "Tem certeza que deseja apagar este plano de aula?";
+            if (confirm(msg)) {
               await supabase.from('planejamento_professor').delete().eq('id', id);
               fetchData();
             }
