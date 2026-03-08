@@ -47,8 +47,14 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
   
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+  
   // States de Formulário
-  const [mnDate, setMnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [mnDate, setMnDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [mnCol, setMnCol] = useState('');
   const [mnAlm, setMnAlm] = useState('');
   const [mnLan, setMnLan] = useState('');
@@ -75,7 +81,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Estados de Rotina
   const [selectedRoutineStudent, setSelectedRoutineStudent] = useState<Student | null>(null);
   const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     attendance: 'present', colacao: 'comeu tudo', almoco: 'comeu tudo', lanche: 'comeu tudo', janta: 'comeu tudo',
     banho: 'não', agua: 'bebeu bastante', evacuacao: 'não', fralda: '1x', sleep: 'dormiu', activities: '', observations: '', mood: 'happy'
   });
@@ -370,7 +376,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 {events.map(ev => (
                   <div key={ev.id} className="p-4 bg-white rounded-2xl border flex justify-between items-center text-xs card-shadow border-orange-50">
                     <div>
-                      <p className="font-bold text-orange-600">{new Date(ev.date).toLocaleDateString()} - {ev.title}</p>
+                      <p className="font-bold text-orange-600">{formatDate(ev.date)} - {ev.title}</p>
                       <p className="text-gray-500 truncate max-w-[200px]">{ev.location}</p>
                     </div>
                     <button onClick={() => onDeleteEvent(ev.id)} className="text-red-500 font-black">Excluir</button>

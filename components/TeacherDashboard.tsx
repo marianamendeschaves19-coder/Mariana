@@ -39,7 +39,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Estados de Planejamento
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [planData, setPlanData] = useState({
-    date: new Date().toISOString().split('T')[0], 
+    date: new Date().toLocaleDateString('en-CA'), 
     lessonNumber: '', 
     classId: '', 
     materials: '', 
@@ -50,7 +50,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   });
 
   const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     attendance: 'present', 
     colacao: 'comeu tudo', 
     almoco: 'comeu tudo', 
@@ -99,7 +99,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (!selectedStudent || !selectedCategory || !logContent.trim()) return;
     
     const now = new Date();
-    const date = now.toISOString().split('T')[0];
+    const date = now.toLocaleDateString('en-CA');
     const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const teacher = users.find(u => u.id === currentUserId);
 
@@ -143,7 +143,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const clearPlanForm = () => {
     setEditingPlanId(null);
     setPlanData({
-      date: new Date().toISOString().split('T')[0], lessonNumber: '', classId: '', materials: '', objective: '', content: '', assessment: '', bnccCodes: ''
+      date: new Date().toLocaleDateString('en-CA'), lessonNumber: '', classId: '', materials: '', objective: '', content: '', assessment: '', bnccCodes: ''
     });
   };
 
@@ -240,7 +240,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Linha do Tempo (Hoje)</h4>
                   <div className="space-y-4">
                     {routineLogs
-                      .filter(l => l.studentId === selectedStudent.id && l.date === new Date().toISOString().split('T')[0])
+                      .filter(l => l.studentId === selectedStudent.id && l.date === new Date().toLocaleDateString('en-CA'))
                       .sort((a, b) => b.time.localeCompare(a.time))
                       .map(log => (
                         <div key={log.id} className="bg-white p-5 rounded-[1.5rem] card-shadow border border-orange-50 flex gap-4 animate-in fade-in slide-in-from-bottom-2">
@@ -257,7 +257,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           </div>
                         </div>
                       ))}
-                    {routineLogs.filter(l => l.studentId === selectedStudent.id && l.date === new Date().toISOString().split('T')[0]).length === 0 && (
+                    {routineLogs.filter(l => l.studentId === selectedStudent.id && l.date === new Date().toLocaleDateString('en-CA')).length === 0 && (
                       <div className="bg-white/50 p-8 rounded-[2rem] border-2 border-dashed border-gray-200 text-center">
                         <p className="text-xs font-bold text-gray-400 uppercase italic">Nenhum registro realizado hoje ainda.</p>
                       </div>

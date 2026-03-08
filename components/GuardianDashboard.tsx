@@ -27,6 +27,11 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'routines' | 'menu' | 'events' | 'mural' | 'chat'>('routines');
   const [selectedChild, setSelectedChild] = useState<Student | null>(students[0] || null);
 
+  const formatDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
   const availableContacts = users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.TEACHER);
 
   const studentRoutines = routines
@@ -138,7 +143,7 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
               studentRoutines.map(routine => (
                 <div key={routine.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 animate-in fade-in slide-in-from-bottom-4 space-y-8">
                   <div className="flex justify-between items-center border-b pb-4">
-                    <h4 className="text-lg font-black text-gray-900">Agenda de {new Date(routine.date).toLocaleDateString()}</h4>
+                    <h4 className="text-lg font-black text-gray-900">Agenda de {formatDate(routine.date)}</h4>
                     <div className="flex items-center gap-2">
                        {routine.attendance === 'absent' ? (
                          <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">FALTOU</span>
@@ -178,7 +183,7 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
                     </div>
                   </div>
 
-                  {routine.attendance === 'absent' ? (
+                  {routine.attendance === 'absent' && (
                     <div className="p-8 bg-red-50/50 rounded-[2rem] border border-red-100 text-center">
                       <p className="text-sm font-bold text-red-800">Criança ausente nesta data.</p>
                       {routine.observations && (
@@ -187,43 +192,6 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <>
-                      {/* Refeições Completas */}
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1">🍎 Alimentação e Hidratação</h5>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Colação</p><p className="text-xs font-bold text-black">{routine.colacao}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Almoço</p><p className="text-xs font-bold text-black">{routine.almoco}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Lanche</p><p className="text-xs font-bold text-black">{routine.lanche}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Janta</p><p className="text-xs font-bold text-black">{routine.janta}</p></div>
-                          <div className="p-3 bg-orange-50 rounded-2xl border border-orange-100"><p className="text-[8px] font-black text-orange-400 uppercase mb-1">Água</p><p className="text-xs font-bold text-black">{routine.agua}</p></div>
-                        </div>
-                      </div>
-
-                      {/* Cuidados e Bem-estar */}
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1">🛁 Cuidados e Saúde</h5>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Banho</p><p className="text-xs font-bold text-black">{routine.banho}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Evacuação</p><p className="text-xs font-bold text-black">{routine.evacuacao}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Fraldas</p><p className="text-xs font-bold text-black">{routine.fralda}</p></div>
-                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-[8px] font-black text-gray-400 uppercase mb-1">Sono</p><p className="text-xs font-bold text-black">{routine.sleep}</p></div>
-                        </div>
-                      </div>
-
-                      {/* Vivências e Observações */}
-                      <div className="space-y-4">
-                        <div className="bg-orange-50/20 p-5 rounded-[2rem] border border-orange-100">
-                          <p className="text-[9px] font-black text-orange-400 uppercase mb-2">🎨 Atividades do Dia</p>
-                          <p className="text-sm font-bold text-black leading-relaxed">{routine.activities || 'Atividades lúdicas e interativas.'}</p>
-                        </div>
-                        <div className="bg-yellow-50/20 p-5 rounded-[2rem] border border-yellow-100">
-                          <p className="text-[9px] font-black text-yellow-600 uppercase mb-2">📝 Recado da Escola</p>
-                          <p className="text-sm font-bold text-black italic leading-relaxed">"{routine.observations}"</p>
-                        </div>
-                      </div>
-                    </>
                   )}
                 </div>
               ))
