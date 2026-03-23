@@ -161,7 +161,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         {[
           { id: 'menu', label: 'CARDÁPIO' }, { id: 'routines', label: 'DIÁRIO' }, 
           { id: 'classes', label: 'TURMAS' }, { id: 'students', label: 'ALUNOS' }, 
-          { id: 'users', label: 'EQUIPE' }, { id: 'plans', label: 'PLANEJAMENTO' }, 
+          { id: 'users', label: 'EQUIPE' }, 
           { id: 'events', label: 'EVENTOS' }, { id: 'mural', label: 'MURAL' }, 
           { id: 'chat', label: 'CHAT' }
         ].map((tab) => (
@@ -387,89 +387,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     <button onClick={() => onDeleteEvent(ev.id)} className="text-red-500 font-black">Excluir</button>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-          {activeTab === 'plans' && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black text-gray-900 leading-tight">📝 Visto em Planejamentos</h3>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">
-                  Total: {lessonPlans.length}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-6">
-                {lessonPlans.length === 0 ? (
-                  <div className="bg-white p-12 rounded-[2rem] border-2 border-dashed border-gray-100 text-center">
-                    <p className="text-sm font-bold text-gray-400 uppercase italic">Nenhum planejamento enviado pelos professores ainda.</p>
-                  </div>
-                ) : (
-                  lessonPlans.sort((a, b) => b.date.localeCompare(a.date)).map(p => (
-                    <div key={p.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-4 transition-all hover:border-orange-200">
-                      <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-3 py-1 rounded-full uppercase tracking-widest">
-                              {new Date(p.date).toLocaleDateString('pt-BR')}
-                            </span>
-                            <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">
-                              {p.grade} - Aula {p.lessonNumber}
-                            </span>
-                          </div>
-                          <h4 className="font-black text-gray-900 text-lg leading-tight">{p.objective}</h4>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                            Docente: <span className="text-orange-400">{users.find(u => u.id === p.teacherId)?.name || 'Nenhum'}</span>
-                          </p>
-                        </div>
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                          {p.status === 'approved' ? 'Aprovado' : 'Pendente'}
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="p-5 bg-gray-50 rounded-2xl text-sm font-bold text-gray-700 leading-relaxed border border-gray-100">
-                          <p className="text-[9px] font-black text-gray-400 uppercase mb-2">Conteúdo e Desenvolvimento:</p>
-                          {p.content}
-                        </div>
-                        
-                        {p.bnccCodes && (
-                          <div className="flex gap-2 items-center">
-                            <span className="text-[9px] font-black text-purple-400 uppercase">BNCC:</span>
-                            <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{p.bnccCodes}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {p.status === 'pending' ? (
-                        <div className="space-y-4 pt-4 border-t border-gray-100 animate-in slide-in-from-top-2">
-                          <textarea 
-                            placeholder="Adicionar feedback ou orientações para o professor..." 
-                            value={planFeedback[p.id] || ''} 
-                            onChange={(e) => setPlanFeedback({ ...planFeedback, [p.id]: e.target.value })} 
-                            className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold text-xs outline-none border border-gray-100 focus:ring-2 focus:ring-orange-200 min-h-[80px] resize-none" 
-                          />
-                          <button 
-                            onClick={() => handleApprovePlan(p.id)} 
-                            className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:scale-[1.01] transition-all active:scale-95"
-                          >
-                            DAR VISTO E APROVAR PLANEJAMENTO
-                          </button>
-                        </div>
-                      ) : (
-                        p.managerFeedback && (
-                          <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3 items-start">
-                            <span className="text-lg">💬</span>
-                            <div>
-                               <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Meu Feedback Enviado</p>
-                               <p className="text-xs font-bold text-blue-700 italic">"{p.managerFeedback}"</p>
-                            </div>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           )}
