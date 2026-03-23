@@ -512,6 +512,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                          </div>
                          <h5 className="font-bold text-gray-800 text-sm leading-tight">{p.objective}</h5>
                          <p className="text-[10px] text-gray-400 font-bold uppercase">{classes.find(c => c.id === p.classId)?.name}</p>
+                         <div className="mt-2 p-3 bg-gray-50 rounded-xl text-[11px] text-gray-600 font-medium line-clamp-2 italic border border-gray-100">
+                           {p.content}
+                         </div>
                        </div>
                        <div className="flex items-center gap-2">
                          <button 
