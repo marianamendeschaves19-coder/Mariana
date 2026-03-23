@@ -35,7 +35,10 @@ interface ManagerDashboardProps {
   onSendMessage: (content: string, receiverId: string) => void;
   onUpdateChatConfig: (config: ChatConfig) => void;
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
+  onDeleteRoutine: (studentId: string, date: string) => void;
   onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
+  onDeleteRoutineLog: (id: string) => void;
+  onUpdateRoutineLog: (id: string, content: string) => void;
   currentUserId: string;
 }
 
@@ -43,7 +46,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines, routineLogs,
   onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onUpdateStudent, onDeleteStudent, 
   onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
-  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onSaveRoutineLog, currentUserId
+  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
   
@@ -80,6 +83,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   // Estados de Rotina
   const [selectedRoutineStudent, setSelectedRoutineStudent] = useState<Student | null>(null);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editLogContent, setEditLogContent] = useState('');
   const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
     date: new Date().toLocaleDateString('en-CA'),
     attendance: 'present', colacao: 'comeu tudo', almoco: 'comeu tudo', lanche: 'comeu tudo', janta: 'comeu tudo',
@@ -387,27 +392,85 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           )}
           {activeTab === 'plans' && (
             <div className="space-y-6 animate-in fade-in">
-              <h3 className="text-xl font-black text-gray-900 leading-tight">📝 Visto em Planejamentos</h3>
-              {lessonPlans.map(p => (
-                <div key={p.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-black text-gray-900 text-lg">{p.grade} - Aula {p.lessonNumber}</h4>
-                      <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Docente: {users.find(u => u.id === p.teacherId)?.name}</p>
-                    </div>
-                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                      {p.status === 'approved' ? 'Aprovado' : 'Pendente'}
-                    </span>
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black text-gray-900 leading-tight">📝 Visto em Planejamentos</h3>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">
+                  Total: {lessonPlans.length}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-6">
+                {lessonPlans.length === 0 ? (
+                  <div className="bg-white p-12 rounded-[2rem] border-2 border-dashed border-gray-100 text-center">
+                    <p className="text-sm font-bold text-gray-400 uppercase italic">Nenhum planejamento enviado pelos professores ainda.</p>
                   </div>
-                  <div className="p-4 bg-gray-50 rounded-2xl text-xs font-bold text-gray-700">{p.content}</div>
-                  {p.status === 'pending' && (
-                    <div className="space-y-4 pt-4 border-t border-gray-100">
-                      <textarea placeholder="Adicionar feedback/visto..." value={planFeedback[p.id] || ''} onChange={(e) => setPlanFeedback({ ...planFeedback, [p.id]: e.target.value })} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold text-xs outline-none border" />
-                      <button onClick={() => handleApprovePlan(p.id)} className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">DAR VISTO E APROVAR</button>
+                ) : (
+                  lessonPlans.sort((a, b) => b.date.localeCompare(a.date)).map(p => (
+                    <div key={p.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 space-y-4 transition-all hover:border-orange-200">
+                      <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                              {new Date(p.date).toLocaleDateString('pt-BR')}
+                            </span>
+                            <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                              {p.grade} - Aula {p.lessonNumber}
+                            </span>
+                          </div>
+                          <h4 className="font-black text-gray-900 text-lg leading-tight">{p.objective}</h4>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            Docente: <span className="text-orange-400">{users.find(u => u.id === p.teacherId)?.name || 'Nenhum'}</span>
+                          </p>
+                        </div>
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                          {p.status === 'approved' ? 'Aprovado' : 'Pendente'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="p-5 bg-gray-50 rounded-2xl text-sm font-bold text-gray-700 leading-relaxed border border-gray-100">
+                          <p className="text-[9px] font-black text-gray-400 uppercase mb-2">Conteúdo e Desenvolvimento:</p>
+                          {p.content}
+                        </div>
+                        
+                        {p.bnccCodes && (
+                          <div className="flex gap-2 items-center">
+                            <span className="text-[9px] font-black text-purple-400 uppercase">BNCC:</span>
+                            <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{p.bnccCodes}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {p.status === 'pending' ? (
+                        <div className="space-y-4 pt-4 border-t border-gray-100 animate-in slide-in-from-top-2">
+                          <textarea 
+                            placeholder="Adicionar feedback ou orientações para o professor..." 
+                            value={planFeedback[p.id] || ''} 
+                            onChange={(e) => setPlanFeedback({ ...planFeedback, [p.id]: e.target.value })} 
+                            className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold text-xs outline-none border border-gray-100 focus:ring-2 focus:ring-orange-200 min-h-[80px] resize-none" 
+                          />
+                          <button 
+                            onClick={() => handleApprovePlan(p.id)} 
+                            className="w-full py-4 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:scale-[1.01] transition-all active:scale-95"
+                          >
+                            DAR VISTO E APROVAR PLANEJAMENTO
+                          </button>
+                        </div>
+                      ) : (
+                        p.managerFeedback && (
+                          <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3 items-start">
+                            <span className="text-lg">💬</span>
+                            <div>
+                               <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Meu Feedback Enviado</p>
+                               <p className="text-xs font-bold text-blue-700 italic">"{p.managerFeedback}"</p>
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  ))
+                )}
+              </div>
             </div>
           )}
           {activeTab === 'routines' && (
@@ -436,7 +499,22 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                             </div>
                           ))}
                       </div>
-                      <button type="submit" className="w-full py-5 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">SALVAR ALTERAÇÕES NO DIÁRIO</button>
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <button type="submit" className="flex-1 py-5 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">SALVAR ALTERAÇÕES NO DIÁRIO</button>
+                        {routines.some(r => r.studentId === selectedRoutineStudent.id && r.date === routineData.date) && (
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              if (confirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.")) {
+                                onDeleteRoutine(selectedRoutineStudent.id, routineData.date);
+                              }
+                            }}
+                            className="py-5 px-8 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                          >
+                            LIMPAR DIÁRIO
+                          </button>
+                        )}
+                      </div>
                    </form>
 
                    <div className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
@@ -447,12 +525,64 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           .sort((a, b) => b.time.localeCompare(a.time))
                           .map(log => (
                             <div key={log.id} className="p-4 bg-gray-50 rounded-2xl border flex justify-between items-start text-xs">
-                              <div className="space-y-1">
-                                <div className="flex gap-2 items-center">
-                                  <span className="font-black text-orange-500">{log.time}</span>
-                                  <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded text-[8px] font-black uppercase">{log.category}</span>
+                              <div className="space-y-1 flex-1">
+                                <div className="flex gap-2 items-center justify-between">
+                                  <div className="flex gap-2 items-center">
+                                    <span className="font-black text-orange-500">{log.time}</span>
+                                    <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded text-[8px] font-black uppercase">{log.category}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        setEditingLogId(log.id);
+                                        setEditLogContent(log.content);
+                                      }}
+                                      className="text-blue-400 hover:text-blue-600"
+                                      title="Editar"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        if (confirm("Deseja apagar este registro?")) {
+                                          onDeleteRoutineLog(log.id);
+                                        }
+                                      }}
+                                      className="text-red-400 hover:text-red-600"
+                                      title="Apagar"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
                                 </div>
-                                <p className="font-bold text-gray-700">{log.content}</p>
+                                {editingLogId === log.id ? (
+                                  <div className="space-y-2 mt-2">
+                                    <textarea
+                                      value={editLogContent}
+                                      onChange={e => setEditLogContent(e.target.value)}
+                                      className="w-full p-3 rounded-xl bg-white text-xs font-bold border border-orange-100 focus:ring-2 focus:ring-orange-200 outline-none min-h-[60px] resize-none"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => {
+                                          onUpdateRoutineLog(log.id, editLogContent);
+                                          setEditingLogId(null);
+                                        }}
+                                        className="px-3 py-1 bg-orange-500 text-white text-[9px] font-black rounded-lg uppercase"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button 
+                                        onClick={() => setEditingLogId(null)}
+                                        className="px-3 py-1 bg-gray-200 text-gray-500 text-[9px] font-black rounded-lg uppercase"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="font-bold text-gray-700">{log.content}</p>
+                                )}
                                 <p className="text-[8px] text-gray-400 uppercase">Por: {log.teacherName}</p>
                               </div>
                             </div>

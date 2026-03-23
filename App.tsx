@@ -178,6 +178,24 @@ const App: React.FC = () => {
     else fetchData();
   };
 
+  const handleDeleteRoutineLog = async (id: string) => {
+    const { error } = await supabase.from('registros_rotina').delete().eq('id', id);
+    if (error) alert("Erro ao excluir registro: " + error.message);
+    else fetchData();
+  };
+
+  const handleUpdateRoutineLog = async (id: string, content: string) => {
+    const { error } = await supabase.from('registros_rotina').update({ conteudo: content }).eq('id', id);
+    if (error) alert("Erro ao atualizar registro: " + error.message);
+    else fetchData();
+  };
+
+  const handleDeleteRoutine = async (studentId: string, date: string) => {
+    const { error } = await supabase.from('diario_aluno').delete().eq('aluno_id', studentId).eq('data', date);
+    if (error) alert("Erro ao limpar diário: " + error.message);
+    else fetchData();
+  };
+
   const handleLikePost = async (postId: string) => {
     if (!currentUser) return;
     const post = posts.find(p => p.id === postId);
@@ -291,7 +309,7 @@ const App: React.FC = () => {
                   
                   // Remover postagens no mural
                   await supabase.from('mural').delete().eq('author_id', id);
-                  
+                }
 
                 const { error } = await supabase.from('usuarios').delete().eq('id', id);
                 
@@ -326,6 +344,9 @@ const App: React.FC = () => {
           onSaveRoutine={handleSaveRoutine}
           routineLogs={routineLogs}
           onSaveRoutineLog={handleSaveRoutineLog}
+          onDeleteRoutineLog={handleDeleteRoutineLog}
+          onUpdateRoutineLog={handleUpdateRoutineLog}
+          onDeleteRoutine={handleDeleteRoutine}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
@@ -335,6 +356,9 @@ const App: React.FC = () => {
           routineLogs={routineLogs}
           onSaveRoutine={handleSaveRoutine} 
           onSaveRoutineLog={handleSaveRoutineLog}
+          onDeleteRoutineLog={handleDeleteRoutineLog}
+          onUpdateRoutineLog={handleUpdateRoutineLog}
+          onDeleteRoutine={handleDeleteRoutine}
           onSaveLessonPlan={async pd => { 
             const payload: any = { 
               professor_id: currentUser.id, 

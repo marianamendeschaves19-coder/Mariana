@@ -17,7 +17,10 @@ interface TeacherDashboardProps {
   routines: RoutineEntry[];
   routineLogs: RoutineLog[];
   onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
+  onDeleteRoutine: (studentId: string, date: string) => void;
   onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
+  onDeleteRoutineLog: (id: string) => void;
+  onUpdateRoutineLog: (id: string, content: string) => void;
   onSaveLessonPlan: (plan: Omit<LessonPlan, 'id' | 'status' | 'createdAt' | 'teacherId'>) => void;
   onDeleteLessonPlan: (id: string, status?: string) => void;
   onCreatePost: (post: any) => void;
@@ -28,7 +31,7 @@ interface TeacherDashboardProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
   classes, students, lessonPlans, posts, messages, chatConfig, users, routines, routineLogs,
-  onSaveRoutine, onSaveRoutineLog, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId 
+  onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId 
 }) => {
   const [activeView, setActiveView] = useState<'routines' | 'planning' | 'mural' | 'chat'>('routines');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -36,6 +39,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [isSuggestingBNCC, setIsSuggestingBNCC] = useState(false);
   const [logContent, setLogContent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<RoutineLog['category'] | null>(null);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editLogContent, setEditLogContent] = useState('');
 
   // Estados de Planejamento
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -265,9 +270,63 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <div className="flex-1 space-y-2">
                             <div className="flex justify-between items-start">
                               <span className="text-[9px] font-black text-white bg-orange-400 px-2 py-0.5 rounded uppercase tracking-widest">{log.category}</span>
-                              <span className="text-[8px] font-bold text-gray-400 uppercase">Por: {log.teacherName}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[8px] font-bold text-gray-400 uppercase">Por: {log.teacherName}</span>
+                                {log.teacherId === currentUserId && (
+                                  <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        setEditingLogId(log.id);
+                                        setEditLogContent(log.content);
+                                      }}
+                                      className="text-blue-400 hover:text-blue-600 transition-colors"
+                                      title="Editar"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        if (confirm("Deseja apagar este registro?")) {
+                                          onDeleteRoutineLog(log.id);
+                                        }
+                                      }}
+                                      className="text-red-400 hover:text-red-600 transition-colors"
+                                      title="Apagar"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-sm font-bold text-gray-800 leading-relaxed">{log.content}</p>
+                            {editingLogId === log.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editLogContent}
+                                  onChange={e => setEditLogContent(e.target.value)}
+                                  className="w-full p-3 rounded-xl bg-gray-50 text-sm font-bold border border-orange-100 focus:ring-2 focus:ring-orange-200 outline-none min-h-[80px] resize-none"
+                                />
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => {
+                                      onUpdateRoutineLog(log.id, editLogContent);
+                                      setEditingLogId(null);
+                                    }}
+                                    className="px-4 py-1.5 bg-orange-500 text-white text-[10px] font-black rounded-lg uppercase shadow-sm"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button 
+                                    onClick={() => setEditingLogId(null)}
+                                    className="px-4 py-1.5 bg-gray-100 text-gray-500 text-[10px] font-black rounded-lg uppercase"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-bold text-gray-800 leading-relaxed">{log.content}</p>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -300,9 +359,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       </select>
                     </div>
                   </div>
-                  <button type="submit" className="w-full py-4 bg-gray-800 text-white font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest hover:bg-black transition-all">
-                    ATUALIZAR STATUS DO DIA
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button type="submit" className="flex-1 py-4 bg-gray-800 text-white font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest hover:bg-black transition-all">
+                      ATUALIZAR STATUS DO DIA
+                    </button>
+                    {routines.some(r => r.studentId === selectedStudent.id && r.date === routineData.date) && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (confirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.")) {
+                            onDeleteRoutine(selectedStudent.id, routineData.date);
+                          }
+                        }}
+                        className="py-4 px-6 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 uppercase text-[10px] tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                      >
+                        LIMPAR DIÁRIO
+                      </button>
+                    )}
+                  </div>
                 </form>
               </div>
             ) : (
@@ -418,30 +492,48 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
              <h4 className="font-black text-gray-700 text-sm tracking-widest uppercase ml-1">Meus Últimos Planos</h4>
              <div className="grid grid-cols-1 gap-4">
                {lessonPlans.length === 0 ? (
-                 <p className="text-center py-8 text-gray-400 italic font-medium">Você ainda não criou nenhum plano.</p>
+                 <div className="p-12 bg-gray-50 rounded-[2rem] border-2 border-dashed border-gray-100 text-center">
+                   <p className="text-xs font-bold text-gray-400 uppercase italic">Você ainda não enviou nenhum planejamento.</p>
+                 </div>
                ) : (
                  lessonPlans.sort((a,b) => b.date.localeCompare(a.date)).map(p => (
                    <div key={p.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 card-shadow hover:border-orange-200 transition-all group">
                      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                       <div className="space-y-1">
-                         <div className="flex items-center gap-2">
-                           <span className="font-black text-orange-500 text-xs">{new Date(p.date).toLocaleDateString()}</span>
+                       <div className="space-y-1 flex-1">
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <span className="font-black text-orange-500 text-xs bg-orange-50 px-2 py-0.5 rounded-full">
+                             {new Date(p.date).toLocaleDateString('pt-BR')}
+                           </span>
                            <span className="text-gray-300">•</span>
                            <span className="font-black text-gray-700 text-xs uppercase tracking-tighter">Aula {p.lessonNumber}</span>
                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
                              {p.status === 'approved' ? 'Aprovado' : 'Pendente'}
                            </span>
                          </div>
-                         <h5 className="font-bold text-gray-800 text-sm line-clamp-1">{p.objective}</h5>
+                         <h5 className="font-bold text-gray-800 text-sm leading-tight">{p.objective}</h5>
                          <p className="text-[10px] text-gray-400 font-bold uppercase">{classes.find(c => c.id === p.classId)?.name}</p>
                        </div>
-                       <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button onClick={() => handleEditPlan(p)} className="p-2 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-100 transition-colors" title="Editar">✏️</button>
-                         <button onClick={() => onDeleteLessonPlan(p.id, p.status)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Apagar">🗑️</button>
+                       <div className="flex items-center gap-2">
+                         <button 
+                           onClick={() => handleEditPlan(p)} 
+                           className="flex-1 md:flex-none p-3 bg-blue-50 text-blue-500 rounded-2xl hover:bg-blue-500 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest" 
+                           title="Editar"
+                         >
+                           <span>✏️</span>
+                           <span className="md:hidden">EDITAR</span>
+                         </button>
+                         <button 
+                           onClick={() => onDeleteLessonPlan(p.id, p.status)} 
+                           className="flex-1 md:flex-none p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest" 
+                           title="Apagar"
+                         >
+                           <span>🗑️</span>
+                           <span className="md:hidden">APAGAR</span>
+                         </button>
                        </div>
                      </div>
                      {p.managerFeedback && (
-                       <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3 items-start">
+                       <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3 items-start animate-in slide-in-from-bottom-2">
                          <span className="text-lg">💬</span>
                          <div>
                             <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Feedback do Gestor</p>
