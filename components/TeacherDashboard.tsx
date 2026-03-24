@@ -27,11 +27,14 @@ interface TeacherDashboardProps {
   onLikePost: (postId: string) => void;
   onSendMessage: (content: string, receiverId: string) => void;
   currentUserId: string;
+  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showConfirm: (message: string, onConfirm: () => void) => void;
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
   classes, students, lessonPlans, posts, messages, chatConfig, users, routines, routineLogs,
-  onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId 
+  onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, onSaveLessonPlan, onDeleteLessonPlan, onCreatePost, onLikePost, onSendMessage, currentUserId,
+  showNotification, showConfirm
 }) => {
   const [activeView, setActiveView] = useState<'routines' | 'planning' | 'mural' | 'chat'>('routines');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -98,7 +101,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     e.preventDefault();
     if (!selectedStudent) return;
     onSaveRoutine({ ...routineData, studentId: selectedStudent.id, authorId: currentUserId });
-    alert(`Status diário de ${selectedStudent.name} salvo com sucesso!`);
+    showNotification(`Status diário de ${selectedStudent.name} salvo com sucesso!`, 'success');
   };
 
   const handleSaveLog = () => {
@@ -132,7 +135,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const handleSuggestBNCC = async () => {
     if (!planData.objective && !planData.content) {
-      alert("Preencha o objetivo ou conteúdo para receber sugestões.");
+      showNotification("Preencha o objetivo ou conteúdo para receber sugestões.", 'info');
       return;
     }
     setIsSuggestingBNCC(true);
@@ -286,9 +289,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                     </button>
                                     <button 
                                       onClick={() => {
-                                        if (confirm("Deseja apagar este registro?")) {
+                                        showConfirm("Deseja apagar este registro?", () => {
                                           onDeleteRoutineLog(log.id);
-                                        }
+                                        });
                                       }}
                                       className="text-red-400 hover:text-red-600 transition-colors"
                                       title="Apagar"
@@ -367,9 +370,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       <button 
                         type="button" 
                         onClick={() => {
-                          if (confirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.")) {
+                          showConfirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.", () => {
                             onDeleteRoutine(selectedStudent.id, routineData.date);
-                          }
+                          });
                         }}
                         className="py-4 px-6 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 uppercase text-[10px] tracking-widest hover:bg-red-500 hover:text-white transition-all"
                       >

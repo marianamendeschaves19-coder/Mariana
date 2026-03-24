@@ -40,13 +40,16 @@ interface ManagerDashboardProps {
   onDeleteRoutineLog: (id: string) => void;
   onUpdateRoutineLog: (id: string, content: string) => void;
   currentUserId: string;
+  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showConfirm: (message: string, onConfirm: () => void) => void;
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
   classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines, routineLogs,
   onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onUpdateStudent, onDeleteStudent, 
   onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
-  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId
+  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId,
+  showNotification, showConfirm
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
   
@@ -119,12 +122,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     e.preventDefault();
     if (!selectedRoutineStudent) return;
     onSaveRoutine({ ...routineData, studentId: selectedRoutineStudent.id, authorId: currentUserId });
-    alert("Diário atualizado e salvo!");
+    showNotification("Diário atualizado e salvo!", 'success');
   };
 
   const handleApprovePlan = (pid: string) => {
     onApprovePlan(pid, planFeedback[pid] || '');
-    alert("Visto aplicado com sucesso!");
+    showNotification("Visto aplicado com sucesso!", 'success');
   };
 
   const handleEditStudent = (s: Student) => {
@@ -177,7 +180,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           {/* Aba Cardápio */}
           {activeTab === 'menu' && (
             <div className="space-y-6 animate-in fade-in">
-              <form onSubmit={e => { e.preventDefault(); onAddMenu({ date: mnDate, colacao: mnCol, almoco: mnAlm, lanche: mnLan, janta: mnJan }); setMnCol(''); setMnAlm(''); setMnLan(''); setMnJan(''); alert("Cardápio do dia salvo!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+              <form onSubmit={e => { e.preventDefault(); onAddMenu({ date: mnDate, colacao: mnCol, almoco: mnAlm, lanche: mnLan, janta: mnJan }); setMnCol(''); setMnAlm(''); setMnLan(''); setMnJan(''); showNotification("Cardápio do dia salvo!", 'success'); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
                 <h3 className="text-xl font-black text-gray-900 leading-tight">🍎 Gestão de Cardápio</h3>
                 <input type="date" value={mnDate} onChange={e => setMnDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border-transparent focus:ring-2 focus:ring-orange-200" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -252,10 +255,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 e.preventDefault(); 
                 if (editingStudentId) {
                   onUpdateStudent(editingStudentId, studentName, targetClassId, guardianEmails);
-                  alert("Aluno atualizado!");
+                  showNotification("Aluno atualizado!", 'success');
                 } else {
                   onAddStudent(studentName, targetClassId, guardianEmails);
-                  alert("Aluno cadastrado!");
+                  showNotification("Aluno cadastrado!", 'success');
                 }
                 clearStudentForm();
               }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
@@ -295,7 +298,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           <td className="py-4 px-2">
                              <div className="flex gap-2">
                                <button onClick={() => handleEditStudent(s)} className="text-blue-500 font-bold hover:underline" title="Editar">✏️ Editar</button>
-                               <button onClick={() => { if(confirm("Apagar aluno?")) onDeleteStudent(s.id); }} className="text-red-500 font-bold hover:underline" title="Excluir">🗑️ Excluir</button>
+                               <button onClick={() => showConfirm("Apagar aluno?", () => onDeleteStudent(s.id))} className="text-red-500 font-bold hover:underline" title="Excluir">🗑️ Excluir</button>
                              </div>
                           </td>
                         </tr>
@@ -309,7 +312,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           {/* Aba Equipe */}
           {activeTab === 'users' && (
             <div className="space-y-6 animate-in fade-in">
-              <form onSubmit={e => { e.preventDefault(); onAddUser(tName, tEmail, tRole); setTName(''); setTEmail(''); alert("Usuário cadastrado com sucesso!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+              <form onSubmit={e => { e.preventDefault(); onAddUser(tName, tEmail, tRole); setTName(''); setTEmail(''); showNotification("Usuário cadastrado com sucesso!", 'success'); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
                 <h3 className="text-xl font-black text-gray-900 leading-tight">👥 Gestão de Equipe e Usuários</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input required placeholder="Nome Completo" value={tName} onChange={e => setTName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
@@ -369,7 +372,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           )}
           {activeTab === 'events' && (
              <div className="space-y-6 animate-in fade-in">
-              <form onSubmit={e => { e.preventDefault(); onAddEvent({ title: evTitle, date: evDate, description: evDesc, location: evLoc }); setEvTitle(''); setEvDate(''); setEvDesc(''); setEvLoc(''); alert("Evento agendado!"); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
+              <form onSubmit={e => { e.preventDefault(); onAddEvent({ title: evTitle, date: evDate, description: evDesc, location: evLoc }); setEvTitle(''); setEvDate(''); setEvDesc(''); setEvLoc(''); showNotification("Evento agendado!", 'success'); }} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
                 <h3 className="text-xl font-black text-gray-900 leading-tight">📅 Novo Evento Escolar</h3>
                 <input required placeholder="Título" value={evTitle} onChange={e => setEvTitle(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
                 <input required type="date" value={evDate} onChange={e => setEvDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
@@ -422,9 +425,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           <button 
                             type="button" 
                             onClick={() => {
-                              if (confirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.")) {
+                              showConfirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.", () => {
                                 onDeleteRoutine(selectedRoutineStudent.id, routineData.date);
-                              }
+                              });
                             }}
                             className="py-5 px-8 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all"
                           >
@@ -461,9 +464,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                                     </button>
                                     <button 
                                       onClick={() => {
-                                        if (confirm("Deseja apagar este registro?")) {
+                                        showConfirm("Deseja apagar este registro?", () => {
                                           onDeleteRoutineLog(log.id);
-                                        }
+                                        });
                                       }}
                                       className="text-red-400 hover:text-red-600"
                                       title="Apagar"

@@ -84,10 +84,16 @@ async function startServer() {
     console.log(`[POST] Registering new user: ${email} (${tipo}) with Firebase UID: ${firebase_uid}`);
     try {
       const result = await pool.query(
-        "INSERT INTO usuarios (firebase_uid, nome, email, tipo) VALUES ($1, $2, $3, $4) RETURNING *",
+        `INSERT INTO usuarios (firebase_uid, nome, email, tipo) 
+         VALUES ($1, $2, $3, $4) 
+         ON CONFLICT (email) DO UPDATE SET 
+           firebase_uid = EXCLUDED.firebase_uid,
+           nome = COALESCE(EXCLUDED.nome, usuarios.nome),
+           tipo = COALESCE(EXCLUDED.tipo, usuarios.tipo)
+         RETURNING *`,
         [firebase_uid, nome, email, tipo]
       );
-      console.log(`[POST] User registered successfully in DB: ${result.rows[0].id}`);
+      console.log(`[POST] User registered/updated successfully in DB: ${result.rows[0].id}`);
       res.json(result.rows[0]);
     } catch (err: any) {
       console.error(`[POST] Error registering user ${email}:`, err);

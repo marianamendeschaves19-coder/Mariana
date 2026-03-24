@@ -46,7 +46,19 @@ const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>('LOGIN');
   const [loginRole, setLoginRole] = useState<UserRole>(UserRole.GUARDIAN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const showConfirm = (message: string, onConfirm: () => void) => {
+    setConfirmModal({ message, onConfirm });
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,7 +218,7 @@ const App: React.FC = () => {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
       // onAuthStateChanged will handle the rest
     } catch (err: any) {
-      alert("Erro no login: " + err.message);
+      showNotification("Erro no login: " + err.message, 'error');
       setIsLoading(false);
     }
   };
@@ -248,11 +260,11 @@ const App: React.FC = () => {
         role: mapDbRoleToUserRole(dbUser.tipo)
       });
       
-      alert("Cadastro realizado com sucesso!");
+      showNotification("Cadastro realizado com sucesso!", 'success');
       setViewState('DASHBOARD');
     } catch (err: any) {
       console.error("Signup error:", err);
-      alert("Erro no cadastro: " + err.message);
+      showNotification("Erro no cadastro: " + err.message, 'error');
     } finally {
       setIsLoading(false);
       setIsSigningUp(false);
@@ -293,7 +305,7 @@ const App: React.FC = () => {
       await apiExecute(query, values);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao salvar diário: " + err.message);
+      showNotification("Erro ao salvar diário: " + err.message, 'error');
     }
   };
 
@@ -307,7 +319,7 @@ const App: React.FC = () => {
       await apiExecute(query, values);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao salvar registro: " + err.message);
+      showNotification("Erro ao salvar registro: " + err.message, 'error');
     }
   };
 
@@ -316,7 +328,7 @@ const App: React.FC = () => {
       await apiExecute("DELETE FROM registros_rotina WHERE id = $1", [id]);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao excluir registro: " + err.message);
+      showNotification("Erro ao excluir registro: " + err.message, 'error');
     }
   };
 
@@ -325,7 +337,7 @@ const App: React.FC = () => {
       await apiExecute("UPDATE registros_rotina SET conteudo = $1 WHERE id = $2", [content, id]);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao atualizar registro: " + err.message);
+      showNotification("Erro ao atualizar registro: " + err.message, 'error');
     }
   };
 
@@ -334,7 +346,7 @@ const App: React.FC = () => {
       await apiExecute("DELETE FROM diario_aluno WHERE aluno_id = $1 AND data = $2", [studentId, date]);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao limpar diário: " + err.message);
+      showNotification("Erro ao limpar diário: " + err.message, 'error');
     }
   };
 
@@ -369,7 +381,7 @@ const App: React.FC = () => {
       await apiExecute(query, values);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao publicar: " + err.message);
+      showNotification("Erro ao publicar: " + err.message, 'error');
     }
   };
 
@@ -456,9 +468,9 @@ const App: React.FC = () => {
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
           routines={routines}
-          onAddClass={async (n, t) => { await apiExecute("INSERT INTO turmas (nome, professor_id) VALUES ($1, $2)", [n, t]); fetchData(); }}
-          onUpdateClassTeacher={async (c, t) => { await apiExecute("UPDATE turmas SET professor_id = $1 WHERE id = $2", [t, c]); fetchData(); }}
-          onDeleteClass={async id => { await apiExecute("DELETE FROM turmas WHERE id = $1", [id]); fetchData(); }}
+          onAddClass={async (n, t) => { await apiExecute("INSERT INTO turmas (nome, professor_id) VALUES ($1, $2)", [n, t]); fetchData(); showNotification("Turma criada!"); }}
+          onUpdateClassTeacher={async (c, t) => { await apiExecute("UPDATE turmas SET professor_id = $1 WHERE id = $2", [t, c]); fetchData(); showNotification("Professor atualizado!"); }}
+          onDeleteClass={async id => { showConfirm("Apagar turma permanentemente?", async () => { await apiExecute("DELETE FROM turmas WHERE id = $1", [id]); fetchData(); showNotification("Turma removida."); }); }}
           onAddStudent={async (n, c, e) => { 
             const email = e.split(',')[0].trim().toLowerCase();
             let respId = null;
@@ -470,6 +482,7 @@ const App: React.FC = () => {
             }
             await apiExecute("INSERT INTO alunos (nome, turma_id, responsavel_id) VALUES ($1, $2, $3)", [n, c, respId]);
             fetchData();
+            showNotification("Aluno cadastrado!");
           }}
           onUpdateStudent={async (id, n, c, e) => {
             const email = e.split(',')[0].trim().toLowerCase();
@@ -482,9 +495,10 @@ const App: React.FC = () => {
             }
             await apiExecute("UPDATE alunos SET nome = $1, turma_id = $2, responsavel_id = $3 WHERE id = $4", [n, c, respId, id]);
             fetchData();
+            showNotification("Dados do aluno atualizados!");
           }}
-          onDeleteStudent={async id => { await apiExecute("DELETE FROM alunos WHERE id = $1", [id]); fetchData(); }}
-          onAddUser={async (n, e, r) => { await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4)", [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123']); fetchData(); }}
+          onDeleteStudent={async id => { showConfirm("Apagar este aluno?", async () => { await apiExecute("DELETE FROM alunos WHERE id = $1", [id]); fetchData(); showNotification("Aluno removido."); }); }}
+          onAddUser={async (n, e, r) => { await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4)", [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123']); fetchData(); showNotification("Usuário cadastrado!"); }}
           onDeleteUser={async id => {
             const user = users.find(u => u.id === id);
             if (!user) return;
@@ -493,7 +507,7 @@ const App: React.FC = () => {
               ? `ATENÇÃO: Deseja excluir o(a) professor(a) ${user.name}? \n\nIsso apagará permanentemente todos os seus planejamentos, registros de rotina e mensagens. Esta ação não pode ser desfeita.`
               : `Deseja excluir o usuário ${user.name}?`;
 
-            if (confirm(confirmMsg)) {
+            showConfirm(confirmMsg, async () => {
               try {
                 await apiExecute("DELETE FROM mensagens WHERE sender_id = $1 OR receiver_id = $1", [id]);
                 if (user.role === UserRole.TEACHER) {
@@ -502,15 +516,15 @@ const App: React.FC = () => {
                   await apiExecute("DELETE FROM mural WHERE author_id = $1", [id]);
                 }
                 await apiExecute("DELETE FROM usuarios WHERE id = $1", [id]);
-                alert("Usuário e todos os seus dados vinculados foram excluídos com sucesso.");
+                showNotification("Usuário e todos os seus dados vinculados foram excluídos com sucesso.", 'success');
                 fetchData();
               } catch (err: any) {
-                alert("Erro ao excluir usuário: " + err.message);
+                showNotification("Erro ao excluir usuário: " + err.message, 'error');
               }
-            }
+            });
           }}
-          onAddEvent={async ev => { await apiExecute("INSERT INTO eventos (title, date, description, location) VALUES ($1, $2, $3, $4)", [ev.title, ev.date, ev.description, ev.location]); fetchData(); }}
-          onDeleteEvent={async id => { await apiExecute("DELETE FROM eventos WHERE id = $1", [id]); fetchData(); }}
+          onAddEvent={async ev => { await apiExecute("INSERT INTO eventos (title, date, description, location) VALUES ($1, $2, $3, $4)", [ev.title, ev.date, ev.description, ev.location]); fetchData(); showNotification("Evento publicado!"); }}
+          onDeleteEvent={async id => { showConfirm("Excluir este evento?", async () => { await apiExecute("DELETE FROM eventos WHERE id = $1", [id]); fetchData(); showNotification("Evento removido."); }); }}
           onAddMenu={async m => { 
             const items = [
               { data: m.date, refeicao: 'colacao', descricao: m.colacao },
@@ -523,19 +537,22 @@ const App: React.FC = () => {
               await apiExecute("INSERT INTO cardapio (data, refeicao, descricao) VALUES ($1, $2, $3) ON CONFLICT (data, refeicao) DO UPDATE SET descricao = EXCLUDED.descricao", [item.data, item.refeicao, item.descricao]);
             }
             fetchData(); 
+            showNotification("Cardápio salvo!");
           }}
-          onDeleteMenu={async id => { await apiExecute("DELETE FROM cardapio WHERE data = $1", [id]); fetchData(); }}
+          onDeleteMenu={async id => { showConfirm("Excluir este cardápio?", async () => { await apiExecute("DELETE FROM cardapio WHERE data = $1", [id]); fetchData(); showNotification("Cardápio removido."); }); }}
           onCreatePost={handleCreatePost}
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }}
-          onUpdateChatConfig={setChatConfig}
-          onApprovePlan={async (pid, f) => { await apiExecute("UPDATE planejamento_professor SET status = $1, manager_feedback = $2 WHERE id = $3", ['approved', f, pid]); fetchData(); }}
+          onUpdateChatConfig={async (c) => { await apiExecute("UPDATE configuracao_chat SET inicio_hora = $1, fim_hora = $2, habilitado = $3", [c.startHour, c.endHour, c.isEnabled]); fetchData(); showNotification("Configuração do chat salva!"); }}
+          onApprovePlan={async (pid, f) => { await apiExecute("UPDATE planejamento_professor SET status = $1, manager_feedback = $2 WHERE id = $3", ['approved', f, pid]); fetchData(); showNotification("Planejamento aprovado!"); }}
           onSaveRoutine={handleSaveRoutine}
           routineLogs={routineLogs}
           onSaveRoutineLog={handleSaveRoutineLog}
           onDeleteRoutineLog={handleDeleteRoutineLog}
           onUpdateRoutineLog={handleUpdateRoutineLog}
           onDeleteRoutine={handleDeleteRoutine}
+          showNotification={showNotification}
+          showConfirm={showConfirm}
         />
       )}
       {currentUser.role === UserRole.TEACHER && (
@@ -571,14 +588,17 @@ const App: React.FC = () => {
             const msg = status === 'approved' 
               ? "Este planejamento já recebeu o visto do gestor. Tem certeza que deseja excluí-lo permanentemente?"
               : "Tem certeza que deseja apagar este plano de aula?";
-            if (confirm(msg)) {
+            showConfirm(msg, async () => {
               await apiExecute("DELETE FROM planejamento_professor WHERE id = $1", [id]);
               fetchData();
-            }
+              showNotification("Planejamento removido.");
+            });
           }}
           onCreatePost={handleCreatePost}
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }}
+          showNotification={showNotification}
+          showConfirm={showConfirm}
         />
       )}
       {currentUser.role === UserRole.GUARDIAN && (
@@ -588,6 +608,48 @@ const App: React.FC = () => {
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }} 
         />
+      )}
+      {notification && (
+        <div className={`fixed bottom-4 right-4 z-50 p-4 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 flex items-center gap-3 border ${
+          notification.type === 'success' ? 'bg-green-50 border-green-100 text-green-700' :
+          notification.type === 'error' ? 'bg-red-50 border-red-100 text-red-700' :
+          'bg-blue-50 border-blue-100 text-blue-700'
+        }`}>
+          <span className="text-xl">
+            {notification.type === 'success' ? '✅' : notification.type === 'error' ? '❌' : 'ℹ️'}
+          </span>
+          <p className="font-bold text-sm">{notification.message}</p>
+          <button onClick={() => setNotification(null)} className="ml-2 text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full card-shadow border border-orange-100 space-y-6 animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center text-3xl mx-auto">❓</div>
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-black text-gray-900">Confirmar Ação</h3>
+              <p className="text-sm font-medium text-gray-500">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="flex-1 py-4 gradient-aquarela text-white font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg active:scale-95 transition-all"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );
