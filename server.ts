@@ -169,7 +169,7 @@ async function startServer() {
   });
 
   // Fallback for API routes to avoid HTML responses
-  app.all("/api/*", (req, res) => {
+  app.all("/api/*all", (req, res) => {
     res.status(404).json({ error: `API route ${req.method} ${req.url} not found` });
   });
 
@@ -183,7 +183,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*all", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
