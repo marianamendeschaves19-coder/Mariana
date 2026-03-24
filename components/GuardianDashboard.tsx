@@ -1,12 +1,11 @@
 
 import React, { useState } from 'react';
-import { Student, RoutineEntry, RoutineLog, FeedPost, ChatMessage, ChatConfig, User, UserRole, Class, SchoolEvent, SchoolMenu } from '../types';
+import { Student, RoutineLog, FeedPost, ChatMessage, ChatConfig, User, UserRole, Class, SchoolEvent, SchoolMenu } from '../types';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
 
 interface GuardianDashboardProps {
   students: Student[];
-  routines: RoutineEntry[];
   routineLogs: RoutineLog[];
   posts: FeedPost[];
   messages: ChatMessage[];
@@ -21,7 +20,7 @@ interface GuardianDashboardProps {
 }
 
 const GuardianDashboard: React.FC<GuardianDashboardProps> = ({ 
-  students, routines, routineLogs, posts, messages, chatConfig, classes, users, events, menus,
+  students, routineLogs, posts, messages, chatConfig, classes, users, events, menus,
   onLikePost, onSendMessage, currentUserId 
 }) => {
   const [activeTab, setActiveTab] = useState<'routines' | 'menu' | 'events' | 'mural' | 'chat'>('routines');
@@ -34,19 +33,16 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
 
   const availableContacts = users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.TEACHER);
 
-  const studentRoutines = routines
-    .filter(r => r.studentId === selectedChild?.id)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const studentLogs = routineLogs
+    .filter(l => l.studentId === selectedChild?.id)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
-  const getMoodEmoji = (mood: string) => {
-    switch(mood) {
-      case 'happy': return '😊 Feliz';
-      case 'calm': return '😌 Calmo';
-      case 'tired': return '😴 Cansado';
-      case 'fussy': return '😫 Agitado';
-      default: return '😊';
-    }
-  };
+  // Agrupar logs por data
+  const logsByDate = studentLogs.reduce((acc: { [key: string]: RoutineLog[] }, log) => {
+    if (!acc[log.date]) acc[log.date] = [];
+    acc[log.date].push(log);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -123,78 +119,58 @@ const GuardianDashboard: React.FC<GuardianDashboardProps> = ({
                >
                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner ${selectedChild?.id === child.id ? 'bg-white/20' : 'bg-orange-50'}`}>👶</div>
                  <div className="text-left overflow-hidden">
-                   <p className="font-bold text-sm truncate">{child.name}</p>
-                   <p className={`text-[9px] uppercase font-black opacity-60 ${selectedChild?.id === child.id ? 'text-white' : 'text-gray-400'}`}>
-                     {classes.find(c => c.id === child.classId)?.name}
-                   </p>
+                    <p className="font-bold text-sm truncate">{child.name}</p>
+                    <p className={`text-[9px] uppercase font-black opacity-60 ${selectedChild?.id === child.id ? 'text-white' : 'text-gray-400'}`}>
+                      {classes.find(c => c.id === child.classId)?.name}
+                    </p>
                  </div>
                </button>
              ))}
           </div>
 
           <div className="lg:col-span-3 space-y-6">
-            {studentRoutines.length === 0 ? (
+            {Object.keys(logsByDate).length === 0 ? (
               <div className="bg-white p-16 rounded-[2rem] card-shadow text-center border-2 border-dashed border-gray-100">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📭</div>
                 <h4 className="text-lg font-black text-gray-600">Nada por aqui ainda</h4>
                 <p className="text-sm text-gray-400 font-medium">As rotinas de {selectedChild?.name} aparecerão aqui assim que publicadas.</p>
               </div>
             ) : (
-              studentRoutines.map(routine => (
-                <div key={routine.id} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 animate-in fade-in slide-in-from-bottom-4 space-y-8">
-                  <div className="flex justify-between items-center border-b pb-4">
-                    <h4 className="text-lg font-black text-gray-900">Agenda de {formatDate(routine.date)}</h4>
-                    <div className="flex items-center gap-2">
-                       {routine.attendance === 'absent' ? (
-                         <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">FALTOU</span>
-                       ) : (
-                         <span className="bg-green-100 text-green-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">PRESENTE</span>
-                       )}
-                       <span className="bg-orange-100 text-orange-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                        {getMoodEmoji(routine.mood)}
-                      </span>
-                    </div>
-                  </div>
+              Object.keys(logsByDate)
+                .sort((a, b) => b.localeCompare(a))
+                .map(date => {
+                  const logs = logsByDate[date] || [];
+                  
+                  return (
+                    <div key={date} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-50 animate-in fade-in slide-in-from-bottom-4 space-y-6">
+                      <div className="flex justify-between items-center border-b pb-4">
+                        <h4 className="text-lg font-black text-gray-900">Agenda de {formatDate(date)}</h4>
+                      </div>
 
-                  {/* Linha do Tempo de Registros */}
-                  <div className="space-y-4">
-                    <h5 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1">🕒 Linha do Tempo</h5>
-                    <div className="space-y-4">
-                      {routineLogs
-                        .filter(l => l.studentId === selectedChild?.id && l.date === routine.date)
-                        .sort((a, b) => b.time.localeCompare(a.time))
-                        .map(log => (
-                          <div key={log.id} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 flex gap-4">
-                            <div className="text-center min-w-[50px]">
-                              <p className="text-[10px] font-black text-orange-500">{log.time}</p>
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between items-center mb-1">
-                                <span className="text-[8px] font-black text-white bg-orange-400 px-2 py-0.5 rounded uppercase">{log.category}</span>
-                                <span className="text-[7px] font-bold text-gray-400 uppercase">Prof(a). {log.teacherName}</span>
+                      {logs.length > 0 && (
+                        <div className="space-y-4">
+                          <h5 className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1">🕒 Linha do Tempo</h5>
+                          <div className="space-y-4">
+                            {logs.sort((a, b) => b.time.localeCompare(a.time)).map(log => (
+                              <div key={log.id} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 flex gap-4">
+                                <div className="text-center min-w-[50px]">
+                                  <p className="text-[10px] font-black text-orange-500">{log.time}</p>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <span className="text-[8px] font-black text-white bg-orange-400 px-2 py-0.5 rounded uppercase">{log.category}</span>
+                                    <span className="text-[7px] font-bold text-gray-400 uppercase">Prof(a). {log.teacherName}</span>
+                                  </div>
+                                  <p className="text-xs font-bold text-gray-700">{log.content}</p>
+                                </div>
                               </div>
-                              <p className="text-xs font-bold text-gray-700">{log.content}</p>
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      {routineLogs.filter(l => l.studentId === selectedChild?.id && l.date === routine.date).length === 0 && (
-                        <p className="text-[10px] text-gray-400 italic text-center py-2">Nenhum registro detalhado para este dia.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {routine.attendance === 'absent' && (
-                    <div className="p-8 bg-red-50/50 rounded-[2rem] border border-red-100 text-center">
-                      <p className="text-sm font-bold text-red-800">Criança ausente nesta data.</p>
-                      {routine.observations && (
-                        <div className="mt-4 p-4 bg-white/50 rounded-2xl italic text-gray-600 text-sm">
-                          "{routine.observations}"
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ))
+                  );
+                })
             )}
           </div>
         </div>

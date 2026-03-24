@@ -30,7 +30,7 @@ CREATE TABLE usuarios (
     nome TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     tipo tipo_usuario NOT NULL,
-    password TEXT, -- Opcional se usar apenas Firebase, mas mantido para compatibilidade
+    password TEXT DEFAULT '123456', -- Opcional se usar apenas Firebase, mas mantido para compatibilidade
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -46,6 +46,7 @@ CREATE TABLE turmas (
 CREATE TABLE alunos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
+    data_nascimento DATE,
     turma_id UUID REFERENCES turmas(id) ON DELETE SET NULL,
     responsavel_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -146,7 +147,7 @@ CREATE TABLE mensagens (
 
 -- 14. Inserção de Dados Iniciais (Administrador Padrão)
 INSERT INTO usuarios (nome, email, tipo, password) 
-VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123')
+VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123456')
 ON CONFLICT (email) DO NOTHING;
 
 -- FIM DO SCRIPT

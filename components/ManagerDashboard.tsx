@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Class, Student, User, UserRole, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu, RoutineEntry, RoutineLog } from '../types';
+import { Class, Student, User, UserRole, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu, RoutineLog } from '../types';
 import CreatePostForm from './CreatePostForm';
 import FeedSection from './FeedSection';
 import ChatSection from './ChatSection';
@@ -15,13 +15,12 @@ interface ManagerDashboardProps {
   chatConfig: ChatConfig;
   events: SchoolEvent[];
   menus: SchoolMenu[];
-  routines: RoutineEntry[];
   routineLogs: RoutineLog[];
   onAddClass: (name: string, teacherId: string) => void;
   onUpdateClassTeacher: (classId: string, teacherId: string) => void;
   onDeleteClass: (id: string) => void;
-  onAddStudent: (studentName: string, classId: string, guardianEmails: string) => void;
-  onUpdateStudent: (id: string, studentName: string, classId: string, guardianEmails: string) => void;
+  onAddStudent: (studentName: string, classId: string, guardianEmails: string, birthDate: string) => void;
+  onUpdateStudent: (id: string, studentName: string, classId: string, guardianEmails: string, birthDate: string) => void;
   onDeleteStudent: (id: string) => void;
   onAddUser: (name: string, email: string, role: UserRole, password?: string) => void;
   onDeleteUser: (id: string) => void;
@@ -34,8 +33,6 @@ interface ManagerDashboardProps {
   onLikePost: (postId: string) => void;
   onSendMessage: (content: string, receiverId: string) => void;
   onUpdateChatConfig: (config: ChatConfig) => void;
-  onSaveRoutine: (routine: Omit<RoutineEntry, 'id'>) => void;
-  onDeleteRoutine: (studentId: string, date: string) => void;
   onSaveRoutineLog: (log: Omit<RoutineLog, 'id' | 'createdAt'>) => void;
   onDeleteRoutineLog: (id: string) => void;
   onUpdateRoutineLog: (id: string, content: string) => void;
@@ -45,13 +42,13 @@ interface ManagerDashboardProps {
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
-  classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routines, routineLogs,
+  classes, students, users, lessonPlans = [], posts, messages, chatConfig, events, menus, routineLogs,
   onAddClass, onUpdateClassTeacher, onDeleteClass, onAddStudent, onUpdateStudent, onDeleteStudent, 
   onAddUser, onDeleteUser, onAddEvent, onDeleteEvent, onAddMenu, onDeleteMenu,
-  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId,
+  onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId,
   showNotification, showConfirm
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events' | 'menu'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events' | 'menu'>('dashboard');
   
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -72,6 +69,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Alunos Form
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState('');
+  const [studentBirthDate, setStudentBirthDate] = useState('');
   const [targetClassId, setTargetClassId] = useState('');
   const [guardianEmails, setGuardianEmails] = useState('');
 
@@ -84,48 +82,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [evDesc, setEvDesc] = useState('');
   const [evLoc, setEvLoc] = useState('');
 
-  // Estados de Rotina
-  const [selectedRoutineStudent, setSelectedRoutineStudent] = useState<Student | null>(null);
-  const [editingLogId, setEditingLogId] = useState<string | null>(null);
-  const [editLogContent, setEditLogContent] = useState('');
-  const [routineData, setRoutineData] = useState<Omit<RoutineEntry, 'id' | 'studentId' | 'authorId'>>({
-    date: new Date().toLocaleDateString('en-CA'),
-    attendance: 'present', colacao: 'comeu tudo', almoco: 'comeu tudo', lanche: 'comeu tudo', janta: 'comeu tudo',
-    banho: 'não', agua: 'bebeu bastante', evacuacao: 'não', fralda: '1x', sleep: 'dormiu', activities: '', observations: '', mood: 'happy'
-  });
-
-  useEffect(() => {
-    if (selectedRoutineStudent) {
-      const existing = routines.find(r => r.studentId === selectedRoutineStudent.id && r.date === routineData.date);
-      if (existing) setRoutineData({ ...existing } as any);
-      else setRoutineData(prev => ({ 
-        ...prev, 
-        activities: '', 
-        observations: '', 
-        attendance: 'present',
-        colacao: 'comeu tudo', 
-        almoco: 'comeu tudo', 
-        lanche: 'comeu tudo', 
-        janta: 'comeu tudo',
-        banho: 'não', 
-        agua: 'bebeu bastante', 
-        evacuacao: 'não', 
-        fralda: '1x', 
-        sleep: 'dormiu'
-      }));
-    }
-  }, [selectedRoutineStudent, routineData.date]);
-
-  const handleRoutineSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRoutineStudent) return;
-    onSaveRoutine({ ...routineData, studentId: selectedRoutineStudent.id, authorId: currentUserId });
-    showNotification("Diário atualizado e salvo!", 'success');
-  };
-
   const handleEditStudent = (s: Student) => {
     setEditingStudentId(s.id);
     setStudentName(s.name);
+    setStudentBirthDate(s.birthDate || '');
     setTargetClassId(s.classId);
     const emails = s.guardianIds.map(gid => users.find(u => u.id === gid)?.email).filter(Boolean).join(', ');
     setGuardianEmails(emails);
@@ -136,6 +96,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const clearStudentForm = () => {
     setEditingStudentId(null);
     setStudentName('');
+    setStudentBirthDate('');
     setTargetClassId('');
     setGuardianEmails('');
   };
@@ -155,7 +116,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     <div className="space-y-6 font-['Quicksand']">
       <div className="flex gap-2 border-b overflow-x-auto pb-2 scrollbar-hide">
         {[
-          { id: 'dashboard', label: 'DASHBOARD' }, { id: 'menu', label: 'CARDÁPIO' }, { id: 'routines', label: 'DIÁRIO' }, 
+          { id: 'dashboard', label: 'DASHBOARD' }, { id: 'menu', label: 'CARDÁPIO' }, 
           { id: 'classes', label: 'TURMAS' }, { id: 'students', label: 'ALUNOS' }, 
           { id: 'users', label: 'EQUIPE' }, { id: 'plans', label: 'PLANEJAMENTOS' },
           { id: 'events', label: 'EVENTOS' }, { id: 'mural', label: 'MURAL' }, 
@@ -193,7 +154,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
               <div className="bg-white p-8 rounded-[2rem] border border-orange-100 card-shadow space-y-6">
                 <h3 className="text-xl font-black text-gray-900 leading-tight">🚀 Visão Geral da Escola</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="space-y-4">
                     <h4 className="text-xs font-black text-orange-500 uppercase tracking-widest">Próximos Eventos</h4>
                     <div className="space-y-2">
@@ -222,6 +183,31 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         </div>
                       ))}
                       {lessonPlans.filter(p => p.status === 'pending').length === 0 && <p className="text-xs text-gray-400 italic">Tudo em dia!</p>}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-pink-500 uppercase tracking-widest">Aniversariantes do Mês</h4>
+                    <div className="space-y-2">
+                      {students.filter(s => {
+                        if (!s.birthDate) return false;
+                        const birthMonth = new Date(s.birthDate).getMonth();
+                        const currentMonth = new Date().getMonth();
+                        return birthMonth === currentMonth;
+                      }).slice(0, 5).map(s => (
+                        <div key={s.id} className="p-4 bg-pink-50 rounded-2xl border border-pink-100 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-pink-800 text-sm">{s.name}</p>
+                            <p className="text-[10px] text-pink-500">{s.birthDate ? new Date(s.birthDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''}</p>
+                          </div>
+                          <span className="text-xs font-black text-pink-400">🎂</span>
+                        </div>
+                      ))}
+                      {students.filter(s => {
+                        if (!s.birthDate) return false;
+                        const birthMonth = new Date(s.birthDate).getMonth();
+                        const currentMonth = new Date().getMonth();
+                        return birthMonth === currentMonth;
+                      }).length === 0 && <p className="text-xs text-gray-400 italic">Nenhum aniversariante este mês.</p>}
                     </div>
                   </div>
                 </div>
@@ -316,10 +302,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <form onSubmit={e => { 
                 e.preventDefault(); 
                 if (editingStudentId) {
-                  onUpdateStudent(editingStudentId, studentName, targetClassId, guardianEmails);
+                  onUpdateStudent(editingStudentId, studentName, targetClassId, guardianEmails, studentBirthDate);
                   showNotification("Aluno atualizado!", 'success');
                 } else {
-                  onAddStudent(studentName, targetClassId, guardianEmails);
+                  onAddStudent(studentName, targetClassId, guardianEmails, studentBirthDate);
                   showNotification("Aluno cadastrado!", 'success');
                 }
                 clearStudentForm();
@@ -328,7 +314,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <h3 className="text-xl font-black text-gray-900 leading-tight">🧒 {editingStudentId ? 'Alterar Dados do Aluno' : 'Cadastro de Aluno'}</h3>
                   {editingStudentId && <button type="button" onClick={clearStudentForm} className="text-[10px] font-black text-gray-400 uppercase hover:text-red-500">Cancelar Edição</button>}
                 </div>
-                <input required placeholder="Nome do Aluno" value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input required placeholder="Nome do Aluno" value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-2">Data de Nascimento</label>
+                    <input required type="date" value={studentBirthDate} onChange={e => setStudentBirthDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
+                  </div>
+                </div>
                 <select required value={targetClassId} onChange={e => setTargetClassId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border">
                   <option value="">Selecione a Turma</option>
                   {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -344,6 +336,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     <thead>
                       <tr className="border-b font-black text-orange-500 uppercase tracking-widest">
                         <th className="pb-4 px-2">Aluno</th>
+                        <th className="pb-4 px-2">Nascimento</th>
                         <th className="pb-4 px-2">Turma</th>
                         <th className="pb-4 px-2">Responsáveis (E-mails)</th>
                         <th className="pb-4 px-2">Ações</th>
@@ -353,6 +346,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       {students.map(s => (
                         <tr key={s.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
                           <td className="py-4 px-2 font-bold">{s.name}</td>
+                          <td className="py-4 px-2 font-medium">{s.birthDate ? formatDate(s.birthDate) : '---'}</td>
                           <td className="py-4 px-2 font-medium">{classes.find(c => c.id === s.classId)?.name || '---'}</td>
                           <td className="py-4 px-2 font-medium">
                             {s.guardianIds.map(gid => users.find(u => u.id === gid)?.email).filter(Boolean).join(', ')}
@@ -521,130 +515,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               </div>
             </div>
           )}
-          {activeTab === 'routines' && (
-            <div className="space-y-6 animate-in fade-in">
-               <div className="bg-white p-6 rounded-[2rem] card-shadow border border-orange-100 flex gap-4">
-                <select className="flex-1 p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" onChange={e => {
-                  const student = students.find(s => s.id === e.target.value);
-                  setSelectedRoutineStudent(student || null);
-                }}>
-                  <option value="">Visualizar Diário de...</option>
-                  {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <input type="date" value={routineData.date} onChange={e => setRoutineData({...routineData, date: e.target.value})} className="p-4 rounded-2xl bg-gray-50 text-black font-bold outline-none border" />
-              </div>
-              {selectedRoutineStudent && (
-                 <div className="space-y-6">
-                   <form onSubmit={handleRoutineSubmit} className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-6">
-                      <h3 className="text-lg font-black text-gray-900 leading-tight">Revisão do Diário: {selectedRoutineStudent.name}</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {['Colacao', 'Almoco', 'Lanche', 'Janta'].map(field => (
-                            <div key={field}>
-                              <label className="text-[9px] font-black text-gray-400 uppercase">{field}</label>
-                              <select value={(routineData as any)[field.toLowerCase()]} onChange={e => setRoutineData({...routineData, [field.toLowerCase()]: e.target.value as any})} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold text-black border">
-                                  <option value="comeu tudo">Comeu tudo</option><option value="comeu bem">Comeu bem</option><option value="comeu metade">Comeu metade</option><option value="recusou">Recusou</option><option value="não ofertado">Não ofertado</option>
-                              </select>
-                            </div>
-                          ))}
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        <button type="submit" className="flex-1 py-5 gradient-aquarela text-white font-black rounded-2xl shadow-xl uppercase">SALVAR ALTERAÇÕES NO DIÁRIO</button>
-                        {routines.some(r => r.studentId === selectedRoutineStudent.id && r.date === routineData.date) && (
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              showConfirm("Deseja limpar todos os dados do status diário? Isso não apagará os registros da linha do tempo.", () => {
-                                onDeleteRoutine(selectedRoutineStudent.id, routineData.date);
-                              });
-                            }}
-                            className="py-5 px-8 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all"
-                          >
-                            LIMPAR DIÁRIO
-                          </button>
-                        )}
-                      </div>
-                   </form>
-
-                   <div className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100 space-y-4">
-                      <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest border-l-4 border-orange-400 pl-3">🕒 Registros do Dia</h4>
-                      <div className="space-y-3">
-                        {routineLogs
-                          .filter(l => l.studentId === selectedRoutineStudent.id && l.date === routineData.date)
-                          .sort((a, b) => b.time.localeCompare(a.time))
-                          .map(log => (
-                            <div key={log.id} className="p-4 bg-gray-50 rounded-2xl border flex justify-between items-start text-xs">
-                              <div className="space-y-1 flex-1">
-                                <div className="flex gap-2 items-center justify-between">
-                                  <div className="flex gap-2 items-center">
-                                    <span className="font-black text-orange-500">{log.time}</span>
-                                    <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded text-[8px] font-black uppercase">{log.category}</span>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <button 
-                                      onClick={() => {
-                                        setEditingLogId(log.id);
-                                        setEditLogContent(log.content);
-                                      }}
-                                      className="text-blue-400 hover:text-blue-600"
-                                      title="Editar"
-                                    >
-                                      ✏️
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        showConfirm("Deseja apagar este registro?", () => {
-                                          onDeleteRoutineLog(log.id);
-                                        });
-                                      }}
-                                      className="text-red-400 hover:text-red-600"
-                                      title="Apagar"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                </div>
-                                {editingLogId === log.id ? (
-                                  <div className="space-y-2 mt-2">
-                                    <textarea
-                                      value={editLogContent}
-                                      onChange={e => setEditLogContent(e.target.value)}
-                                      className="w-full p-3 rounded-xl bg-white text-xs font-bold border border-orange-100 focus:ring-2 focus:ring-orange-200 outline-none min-h-[60px] resize-none"
-                                    />
-                                    <div className="flex gap-2">
-                                      <button 
-                                        onClick={() => {
-                                          onUpdateRoutineLog(log.id, editLogContent);
-                                          setEditingLogId(null);
-                                        }}
-                                        className="px-3 py-1 bg-orange-500 text-white text-[9px] font-black rounded-lg uppercase"
-                                      >
-                                        Salvar
-                                      </button>
-                                      <button 
-                                        onClick={() => setEditingLogId(null)}
-                                        className="px-3 py-1 bg-gray-200 text-gray-500 text-[9px] font-black rounded-lg uppercase"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <p className="font-bold text-gray-700">{log.content}</p>
-                                )}
-                                <p className="text-[8px] text-gray-400 uppercase">Por: {log.teacherName}</p>
-                              </div>
-                            </div>
-                          ))}
-                        {routineLogs.filter(l => l.studentId === selectedRoutineStudent.id && l.date === routineData.date).length === 0 && (
-                          <p className="text-xs text-gray-400 italic text-center py-4">Nenhum registro detalhado para esta data.</p>
-                        )}
-                      </div>
-                   </div>
-                 </div>
-              )}
-            </div>
-          )}
-
         </div>
         
         {/* Painel lateral Gestor */}

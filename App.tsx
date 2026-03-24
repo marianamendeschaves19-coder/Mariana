@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Class, Student, RoutineEntry, RoutineLog, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
+import { User, UserRole, Class, Student, RoutineLog, ViewState, LessonPlan, FeedPost, ChatMessage, ChatConfig, SchoolEvent, SchoolMenu } from './types';
 import Layout from './components/Layout';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
@@ -70,7 +70,6 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [routines, setRoutines] = useState<RoutineEntry[]>([]);
   const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -108,7 +107,6 @@ const App: React.FC = () => {
       const dbUsers = data.usuarios;
       const dbClasses = data.turmas;
       const dbStudents = data.alunos;
-      const dbRoutines = data.diario_aluno;
       const dbLogs = data.registros_rotina;
       const dbPlans = data.planejamento_professor;
       const dbPosts = data.mural;
@@ -125,15 +123,9 @@ const App: React.FC = () => {
       })));
 
       setStudents((dbStudents || []).map((s: any) => ({
-        id: s.id, name: s.nome, classId: s.turma_id, guardianIds: s.responsavel_id ? [s.responsavel_id] : []
+        id: s.id, name: s.nome, classId: s.turma_id, guardianIds: s.responsavel_id ? [s.responsavel_id] : [],
+        birthDate: s.data_nascimento
       })));
-
-      setRoutines((dbRoutines || []).map((r: any) => ({
-        id: r.id, studentId: r.aluno_id, date: r.data, mood: r.humor || 'happy', 
-        attendance: r.attendance || 'present', observations: r.observacoes_professor || '',
-        activities: r.atividades || '', colacao: r.colacao, almoco: r.almoco, lanche: r.lanche, janta: r.janta,
-        banho: r.banho, sleep: r.sleep, evacuacao: r.evacuacao, fralda: r.fralda, agua: r.agua
-      } as any)));
 
       setRoutineLogs((dbLogs || []).map((l: any) => ({
         id: l.id, studentId: l.aluno_id, teacherId: l.professor_id, teacherName: l.professor_nome,
@@ -332,38 +324,6 @@ const App: React.FC = () => {
     setCurrentUser(null);
   };
 
-  const handleSaveRoutine = async (nr: Omit<RoutineEntry, 'id'>) => {
-    const query = `
-      INSERT INTO diario_aluno (aluno_id, data, humor, attendance, atividades, observacoes_professor, colacao, almoco, lanche, janta, banho, sleep, fralda, agua, evacuacao)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      ON CONFLICT (aluno_id, data) DO UPDATE SET
-        humor = EXCLUDED.humor,
-        attendance = EXCLUDED.attendance,
-        atividades = EXCLUDED.atividades,
-        observacoes_professor = EXCLUDED.observacoes_professor,
-        colacao = EXCLUDED.colacao,
-        almoco = EXCLUDED.almoco,
-        lanche = EXCLUDED.lanche,
-        janta = EXCLUDED.janta,
-        banho = EXCLUDED.banho,
-        sleep = EXCLUDED.sleep,
-        fralda = EXCLUDED.fralda,
-        agua = EXCLUDED.agua,
-        evacuacao = EXCLUDED.evacuacao
-    `;
-    const values = [
-      nr.studentId, nr.date, nr.mood, nr.attendance || 'present', nr.activities, nr.observations,
-      nr.colacao, nr.almoco, nr.lanche, nr.janta, nr.banho, nr.sleep, nr.fralda, nr.agua, nr.evacuacao
-    ];
-    
-    try {
-      await apiExecute(query, values);
-      fetchData();
-    } catch (err: any) {
-      showNotification("Erro ao salvar diário: " + err.message, 'error');
-    }
-  };
-
   const handleSaveRoutineLog = async (log: Omit<RoutineLog, 'id' | 'createdAt'>) => {
     const query = `
       INSERT INTO registros_rotina (aluno_id, professor_id, professor_nome, categoria, conteudo, data, horario)
@@ -393,15 +353,6 @@ const App: React.FC = () => {
       fetchData();
     } catch (err: any) {
       showNotification("Erro ao atualizar registro: " + err.message, 'error');
-    }
-  };
-
-  const handleDeleteRoutine = async (studentId: string, date: string) => {
-    try {
-      await apiExecute("DELETE FROM diario_aluno WHERE aluno_id = $1 AND data = $2", [studentId, date]);
-      fetchData();
-    } catch (err: any) {
-      showNotification("Erro ao limpar diário: " + err.message, 'error');
     }
   };
 
@@ -522,33 +473,32 @@ const App: React.FC = () => {
         <ManagerDashboard 
           classes={classes} students={students} users={users} posts={posts} lessonPlans={lessonPlans}
           messages={messages} chatConfig={chatConfig} events={events} menus={menus} currentUserId={currentUser.id}
-          routines={routines}
           onAddClass={async (n, t) => { await apiExecute("INSERT INTO turmas (nome, professor_id) VALUES ($1, $2)", [n, t]); fetchData(); showNotification("Turma criada!"); }}
           onUpdateClassTeacher={async (c, t) => { await apiExecute("UPDATE turmas SET professor_id = $1 WHERE id = $2", [t, c]); fetchData(); showNotification("Professor atualizado!"); }}
           onDeleteClass={async id => { showConfirm("Apagar turma permanentemente?", async () => { await apiExecute("DELETE FROM turmas WHERE id = $1", [id]); fetchData(); showNotification("Turma removida."); }); }}
-          onAddStudent={async (n, c, e) => { 
+          onAddStudent={async (n, c, e, b) => { 
             const email = e.split(',')[0].trim().toLowerCase();
             let respId = null;
             const exUsers = await apiExecute("SELECT * FROM usuarios WHERE email = $1", [email]);
             if (exUsers.length > 0) respId = exUsers[0].id;
             else {
-              const nuUsers = await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4) RETURNING id", [`Família de ${n}`, email, 'responsavel', '123']);
+              const nuUsers = await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4) RETURNING id", [`Família de ${n}`, email, 'responsavel', '123456']);
               if (nuUsers.length > 0) respId = nuUsers[0].id;
             }
-            await apiExecute("INSERT INTO alunos (nome, turma_id, responsavel_id) VALUES ($1, $2, $3)", [n, c, respId]);
+            await apiExecute("INSERT INTO alunos (nome, turma_id, responsavel_id, data_nascimento) VALUES ($1, $2, $3, $4)", [n, c, respId, b]);
             fetchData();
             showNotification("Aluno cadastrado!");
           }}
-          onUpdateStudent={async (id, n, c, e) => {
+          onUpdateStudent={async (id, n, c, e, b) => {
             const email = e.split(',')[0].trim().toLowerCase();
             let respId = null;
             const exUsers = await apiExecute("SELECT * FROM usuarios WHERE email = $1", [email]);
             if (exUsers.length > 0) respId = exUsers[0].id;
             else {
-              const nuUsers = await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4) RETURNING id", [`Família de ${n}`, email, 'responsavel', '123']);
+              const nuUsers = await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4) RETURNING id", [`Família de ${n}`, email, 'responsavel', '123456']);
               if (nuUsers.length > 0) respId = nuUsers[0].id;
             }
-            await apiExecute("UPDATE alunos SET nome = $1, turma_id = $2, responsavel_id = $3 WHERE id = $4", [n, c, respId, id]);
+            await apiExecute("UPDATE alunos SET nome = $1, turma_id = $2, responsavel_id = $3, data_nascimento = $4 WHERE id = $5", [n, c, respId, b, id]);
             fetchData();
             showNotification("Dados do aluno atualizados!");
           }}
@@ -560,7 +510,7 @@ const App: React.FC = () => {
               ON CONFLICT (email) DO UPDATE SET 
                 nome = EXCLUDED.nome, 
                 tipo = EXCLUDED.tipo
-            `, [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123']); 
+            `, [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123456']); 
             fetchData(); 
             showNotification("Usuário cadastrado!"); 
           }}
@@ -610,12 +560,10 @@ const App: React.FC = () => {
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }}
           onUpdateChatConfig={async (c) => { await apiExecute("UPDATE configuracao_chat SET inicio_hora = $1, fim_hora = $2, habilitado = $3", [c.startHour, c.endHour, c.isEnabled]); fetchData(); showNotification("Configuração do chat salva!"); }}
           onApprovePlan={async (pid: string, status: 'approved' | 'rejected', f: string) => { await apiExecute("UPDATE planejamento_professor SET status = $1, manager_feedback = $2 WHERE id = $3", [status, f, pid]); fetchData(); showNotification(`Planejamento ${status === 'approved' ? 'aprovado' : 'enviado para revisão'}!`); }}
-          onSaveRoutine={handleSaveRoutine}
           routineLogs={routineLogs}
           onSaveRoutineLog={handleSaveRoutineLog}
           onDeleteRoutineLog={handleDeleteRoutineLog}
           onUpdateRoutineLog={handleUpdateRoutineLog}
-          onDeleteRoutine={handleDeleteRoutine}
           showNotification={showNotification}
           showConfirm={showConfirm}
         />
@@ -623,13 +571,11 @@ const App: React.FC = () => {
       {currentUser.role === UserRole.TEACHER && (
         <TeacherDashboard 
           classes={classes} students={students} lessonPlans={lessonPlans.filter(p => p.teacherId === currentUser.id)} 
-          posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id} routines={routines}
+          posts={posts} messages={messages} chatConfig={chatConfig} users={users} currentUserId={currentUser.id}
           routineLogs={routineLogs}
-          onSaveRoutine={handleSaveRoutine} 
           onSaveRoutineLog={handleSaveRoutineLog}
           onDeleteRoutineLog={handleDeleteRoutineLog}
           onUpdateRoutineLog={handleUpdateRoutineLog}
-          onDeleteRoutine={handleDeleteRoutine}
           onSaveLessonPlan={async pd => { 
             const query = `
               INSERT INTO planejamento_professor (id, professor_id, turma_id, data, conteudo_trabalhado, objective, lesson_number, materials, bncc_codes, assessment)
@@ -668,7 +614,7 @@ const App: React.FC = () => {
       )}
       {currentUser.role === UserRole.GUARDIAN && (
         <GuardianDashboard 
-          students={students.filter(s => s.guardianIds.includes(currentUser.id))} routines={routines} routineLogs={routineLogs} posts={posts} messages={messages} 
+          students={students.filter(s => s.guardianIds.includes(currentUser.id))} routineLogs={routineLogs} posts={posts} messages={messages} 
           chatConfig={chatConfig} classes={classes} users={users} events={events} menus={menus} currentUserId={currentUser.id}
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }} 

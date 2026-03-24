@@ -25,6 +25,7 @@ export interface Student {
   name: string;
   classId: string;
   guardianIds: string[];
+  birthDate?: string;
 }
 
 export interface ChatMessage {
