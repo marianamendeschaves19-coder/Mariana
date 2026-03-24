@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+body {
+  font-family: 'Quicksand', sans-serif;
+  background-color: #fffaf0;
+}
+.gradient-aquarela {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+.card-shadow {
+  box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 8px 10px -6px rgba(245, 158, 11, 0.1);
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

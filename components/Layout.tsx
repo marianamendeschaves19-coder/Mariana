@@ -31,9 +31,15 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
             <h1 className="text-xl font-bold tracking-tight">Agenda Aquarela</h1>
           </div>
           <div className="flex items-center gap-4">
+            <div className="md:hidden text-right">
+              <p className="text-[8px] uppercase font-black opacity-70 tracking-widest">Usuário logado</p>
+            </div>
             <div className="hidden md:block text-right">
-              <p className="text-sm font-semibold">{user.name}</p>
-              <p className="text-xs opacity-80">{getRoleLabel(user.role)}</p>
+              <p className="text-sm font-semibold flex items-center gap-1 justify-end">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                {user.name}
+              </p>
+              <p className="text-[10px] uppercase font-black opacity-70 tracking-widest">Usuário logado • {getRoleLabel(user.role)}</p>
             </div>
             <button 
               onClick={onLogout}
