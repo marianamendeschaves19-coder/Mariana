@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
@@ -80,18 +79,18 @@ async function startServer() {
     if (!pool) {
       return res.status(503).json({ error: "Database not configured" });
     }
-    const { firebase_uid, nome, email, tipo } = req.body;
-    console.log(`[POST] Registering new user: ${email} (${tipo}) with Firebase UID: ${firebase_uid}`);
+    const { firebase_uid, nome, email, tipo, is_signup } = req.body;
+    console.log(`[POST] Registering new user: ${email} (${tipo}) with Firebase UID: ${firebase_uid}, is_signup: ${is_signup}`);
     try {
       const result = await pool.query(
         `INSERT INTO usuarios (firebase_uid, nome, email, tipo) 
-         VALUES ($1, $2, $3, $4) 
+         VALUES ($1, $2, $3, $4::tipo_usuario) 
          ON CONFLICT (email) DO UPDATE SET 
            firebase_uid = EXCLUDED.firebase_uid,
            nome = COALESCE(EXCLUDED.nome, usuarios.nome),
-           tipo = COALESCE(EXCLUDED.tipo, usuarios.tipo)
+           tipo = CASE WHEN $5 = true THEN EXCLUDED.tipo::tipo_usuario ELSE usuarios.tipo END
          RETURNING *`,
-        [firebase_uid, nome, email, tipo]
+        [firebase_uid, nome, email, tipo, is_signup]
       );
       console.log(`[POST] User registered/updated successfully in DB: ${result.rows[0].id}`);
       res.json(result.rows[0]);
@@ -175,6 +174,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

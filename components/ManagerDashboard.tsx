@@ -29,7 +29,7 @@ interface ManagerDashboardProps {
   onDeleteEvent: (id: string) => void;
   onAddMenu: (menu: Partial<SchoolMenu>) => void;
   onDeleteMenu: (id: string) => void;
-  onApprovePlan: (planId: string, feedback: string) => void;
+  onApprovePlan: (planId: string, status: 'approved' | 'rejected', feedback: string) => void;
   onCreatePost: (post: any) => void;
   onLikePost: (postId: string) => void;
   onSendMessage: (content: string, receiverId: string) => void;
@@ -51,7 +51,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   onApprovePlan, onCreatePost, onLikePost, onSendMessage, onUpdateChatConfig, onSaveRoutine, onDeleteRoutine, onSaveRoutineLog, onDeleteRoutineLog, onUpdateRoutineLog, currentUserId,
   showNotification, showConfirm
 }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events'>('menu');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'routines' | 'classes' | 'students' | 'users' | 'plans' | 'mural' | 'chat' | 'events' | 'menu'>('dashboard');
   
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -94,8 +94,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     banho: 'não', agua: 'bebeu bastante', evacuacao: 'não', fralda: '1x', sleep: 'dormiu', activities: '', observations: '', mood: 'happy'
   });
 
-  const [planFeedback, setPlanFeedback] = useState<Record<string, string>>({});
-
   useEffect(() => {
     if (selectedRoutineStudent) {
       const existing = routines.find(r => r.studentId === selectedRoutineStudent.id && r.date === routineData.date);
@@ -123,11 +121,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     if (!selectedRoutineStudent) return;
     onSaveRoutine({ ...routineData, studentId: selectedRoutineStudent.id, authorId: currentUserId });
     showNotification("Diário atualizado e salvo!", 'success');
-  };
-
-  const handleApprovePlan = (pid: string) => {
-    onApprovePlan(pid, planFeedback[pid] || '');
-    showNotification("Visto aplicado com sucesso!", 'success');
   };
 
   const handleEditStudent = (s: Student) => {
@@ -162,9 +155,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     <div className="space-y-6 font-['Quicksand']">
       <div className="flex gap-2 border-b overflow-x-auto pb-2 scrollbar-hide">
         {[
-          { id: 'menu', label: 'CARDÁPIO' }, { id: 'routines', label: 'DIÁRIO' }, 
+          { id: 'dashboard', label: 'DASHBOARD' }, { id: 'menu', label: 'CARDÁPIO' }, { id: 'routines', label: 'DIÁRIO' }, 
           { id: 'classes', label: 'TURMAS' }, { id: 'students', label: 'ALUNOS' }, 
-          { id: 'users', label: 'EQUIPE' }, 
+          { id: 'users', label: 'EQUIPE' }, { id: 'plans', label: 'PLANEJAMENTOS' },
           { id: 'events', label: 'EVENTOS' }, { id: 'mural', label: 'MURAL' }, 
           { id: 'chat', label: 'CHAT' }
         ].map((tab) => (
@@ -177,6 +170,75 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 space-y-6">
           
+          {/* Aba Dashboard */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-[2rem] border border-orange-100 card-shadow flex flex-col items-center justify-center space-y-2">
+                  <span className="text-4xl">🎨</span>
+                  <h4 className="text-2xl font-black text-gray-900">{classes.length}</h4>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Turmas Ativas</p>
+                </div>
+                <div className="bg-white p-6 rounded-[2rem] border border-orange-100 card-shadow flex flex-col items-center justify-center space-y-2">
+                  <span className="text-4xl">🧒</span>
+                  <h4 className="text-2xl font-black text-gray-900">{students.length}</h4>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Alunos Matriculados</p>
+                </div>
+                <div className="bg-white p-6 rounded-[2rem] border border-orange-100 card-shadow flex flex-col items-center justify-center space-y-2">
+                  <span className="text-4xl">👩‍🏫</span>
+                  <h4 className="text-2xl font-black text-gray-900">{users.filter(u => u.role === UserRole.TEACHER).length}</h4>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Professores</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-[2rem] border border-orange-100 card-shadow space-y-6">
+                <h3 className="text-xl font-black text-gray-900 leading-tight">🚀 Visão Geral da Escola</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-orange-500 uppercase tracking-widest">Próximos Eventos</h4>
+                    <div className="space-y-2">
+                      {events.slice(0, 3).map(ev => (
+                        <div key={ev.id} className="p-4 bg-gray-50 rounded-2xl border flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-gray-800 text-sm">{ev.title}</p>
+                            <p className="text-[10px] text-gray-500">{formatDate(ev.date)}</p>
+                          </div>
+                          <span className="text-xs font-black text-orange-400">📅</span>
+                        </div>
+                      ))}
+                      {events.length === 0 && <p className="text-xs text-gray-400 italic">Nenhum evento agendado.</p>}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-blue-500 uppercase tracking-widest">Planejamentos Pendentes</h4>
+                    <div className="space-y-2">
+                      {lessonPlans.filter(p => p.status === 'pending').slice(0, 3).map(plan => (
+                        <div key={plan.id} className="p-4 bg-gray-50 rounded-2xl border flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-gray-800 text-sm">{plan.objective}</p>
+                            <p className="text-[10px] text-gray-500">{users.find(u => u.id === plan.teacherId)?.name}</p>
+                          </div>
+                          <span className="text-xs font-black text-blue-400">📝</span>
+                        </div>
+                      ))}
+                      {lessonPlans.filter(p => p.status === 'pending').length === 0 && <p className="text-xs text-gray-400 italic">Tudo em dia!</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-orange-400 to-pink-500 p-8 rounded-[2.5rem] text-white card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="space-y-2 text-center md:text-left">
+                  <h3 className="text-2xl font-black leading-tight">Bem-vindo(a) ao Aquarela Manager!</h3>
+                  <p className="text-sm font-medium opacity-90">Gerencie sua escola com amor e tecnologia. 🎨🚀</p>
+                </div>
+                <button onClick={() => setActiveTab('mural')} className="px-8 py-4 bg-white text-orange-600 font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:scale-105 transition-all">
+                  Ver Mural da Escola
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Aba Cardápio */}
           {activeTab === 'menu' && (
             <div className="space-y-6 animate-in fade-in">
@@ -359,6 +421,72 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           )}
 
           {/* Outras Abas */}
+          {activeTab === 'plans' && (
+            <div className="space-y-6 animate-in fade-in">
+              <div className="bg-white p-8 rounded-[2rem] card-shadow border border-orange-100">
+                <h3 className="text-xl font-black text-gray-900 leading-tight mb-6">📝 Planejamentos dos Professores</h3>
+                <div className="space-y-4">
+                  {lessonPlans.length === 0 && <p className="text-center text-gray-400 py-8">Nenhum planejamento enviado.</p>}
+                  {lessonPlans.map(plan => (
+                    <div key={plan.id} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{plan.grade} - {formatDate(plan.date)}</p>
+                          <h4 className="text-lg font-black text-gray-800">Aula #{plan.lessonNumber}: {plan.objective}</h4>
+                          <p className="text-xs text-gray-400 uppercase font-bold">Professor: {users.find(u => u.id === plan.teacherId)?.name || 'N/A'}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                          plan.status === 'approved' ? 'bg-green-100 text-green-600' : 
+                          plan.status === 'rejected' ? 'bg-red-100 text-red-600' : 
+                          'bg-yellow-100 text-yellow-600'
+                        }`}>
+                          {plan.status === 'approved' ? 'Aprovado' : plan.status === 'rejected' ? 'Revisão' : 'Pendente'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-1">
+                          <p className="font-black text-gray-400 uppercase text-[9px]">Conteúdo</p>
+                          <p className="text-gray-700">{plan.content}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-black text-gray-400 uppercase text-[9px]">Materiais</p>
+                          <p className="text-gray-700">{plan.materials}</p>
+                        </div>
+                      </div>
+
+                      {plan.status === 'pending' && (
+                        <div className="pt-4 border-t border-gray-200 flex gap-4">
+                          <button 
+                            onClick={() => onApprovePlan(plan.id, 'approved', '')}
+                            className="flex-1 py-3 bg-green-500 text-white font-black rounded-xl text-xs uppercase"
+                          >
+                            APROVAR
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const feedback = prompt("Digite o feedback para revisão:");
+                              if (feedback) onApprovePlan(plan.id, 'rejected', feedback);
+                            }}
+                            className="flex-1 py-3 bg-red-500 text-white font-black rounded-xl text-xs uppercase"
+                          >
+                            SOLICITAR REVISÃO
+                          </button>
+                        </div>
+                      )}
+
+                      {plan.managerFeedback && (
+                        <div className="p-3 bg-orange-50 rounded-xl border border-orange-100">
+                          <p className="text-[9px] font-black text-orange-400 uppercase">Feedback do Gestor</p>
+                          <p className="text-xs text-orange-700 font-bold italic">"{plan.managerFeedback}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === 'mural' && <div className="space-y-8 animate-in fade-in"><CreatePostForm onCreatePost={onCreatePost} /><FeedSection posts={posts} onLikePost={onLikePost} currentUserId={currentUserId} /></div>}
           {activeTab === 'chat' && (
             <ChatSection 

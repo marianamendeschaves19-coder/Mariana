@@ -72,7 +72,7 @@ export interface LessonPlan {
   bnccCodes: string;
   structure: string;
   assessment: string;
-  status: 'pending' | 'approved';
+  status: 'pending' | 'approved' | 'rejected';
   managerFeedback?: string;
   createdAt: string;
 }

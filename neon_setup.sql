@@ -18,7 +18,7 @@ DROP TYPE IF EXISTS tipo_usuario CASCADE;
 DROP TYPE IF EXISTS tipo_refeicao CASCADE;
 
 -- 3. Criação de Tipos (Enums)
-CREATE TYPE tipo_usuario AS ENUM ('gestao', 'professor', 'responsavel');
+CREATE TYPE tipo_usuario AS ENUM ('gestor', 'professor', 'responsavel');
 CREATE TYPE tipo_refeicao AS ENUM ('colacao', 'almoco', 'lanche', 'janta');
 
 -- 4. Tabela de Usuários
@@ -146,7 +146,7 @@ CREATE TABLE mensagens (
 
 -- 14. Inserção de Dados Iniciais (Administrador Padrão)
 INSERT INTO usuarios (nome, email, tipo, password) 
-VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestao', '123')
+VALUES ('Diretor Aquarela', 'gestor@aquarela.com', 'gestor', '123')
 ON CONFLICT (email) DO NOTHING;
 
 -- FIM DO SCRIPT

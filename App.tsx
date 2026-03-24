@@ -46,8 +46,13 @@ const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>('LOGIN');
   const [loginRole, setLoginRole] = useState<UserRole>(UserRole.GUARDIAN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const isSigningUpRef = React.useRef(isSigningUp);
+  useEffect(() => {
+    isSigningUpRef.current = isSigningUp;
+  }, [isSigningUp]);
+
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
@@ -59,7 +64,6 @@ const App: React.FC = () => {
   const showConfirm = (message: string, onConfirm: () => void) => {
     setConfirmModal({ message, onConfirm });
   };
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Global Data States
@@ -85,13 +89,13 @@ const App: React.FC = () => {
 
   const mapDbRoleToUserRole = (dbRole: string): UserRole => {
     const r = dbRole.toLowerCase();
-    if (r === 'gestao') return UserRole.MANAGER;
+    if (r === 'gestao' || r === 'gestor') return UserRole.MANAGER;
     if (r === 'professor') return UserRole.TEACHER;
     return UserRole.GUARDIAN;
   };
 
   const mapUserRoleToDbRole = (role: UserRole): string => {
-    if (role === UserRole.MANAGER) return 'gestao';
+    if (role === UserRole.MANAGER) return 'gestor';
     if (role === UserRole.TEACHER) return 'professor';
     return 'responsavel';
   };
@@ -172,7 +176,7 @@ const App: React.FC = () => {
       if (firebaseUser) {
         // If we are in the middle of a signup, don't try to fetch the user yet
         // handleSignup will handle the redirection after the DB call
-        if (isSigningUp) return;
+        if (isSigningUpRef.current) return;
 
         try {
           console.log("Auth state changed: user logged in", firebaseUser.uid);
@@ -188,16 +192,50 @@ const App: React.FC = () => {
             });
             setViewState('DASHBOARD');
           } else {
-            console.warn("User exists in Firebase but not in our DB. Signing out.");
-            await signOut(auth);
-            setCurrentUser(null);
-            setViewState('LOGIN');
+            console.warn("User exists in Firebase but not in our DB. Auto-registering as 'responsavel'.");
+            const registerRes = await fetch('/api/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firebase_uid: firebaseUser.uid,
+                nome: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+                email: firebaseUser.email,
+                tipo: 'responsavel',
+                is_signup: false
+              }),
+            });
+            
+            if (registerRes.ok) {
+              const data = await registerRes.json();
+              console.log("User auto-registered successfully:", data.nome);
+              setCurrentUser({
+                id: data.id,
+                name: data.nome,
+                email: data.email,
+                role: mapDbRoleToUserRole(data.tipo)
+              });
+              setViewState('DASHBOARD');
+            } else {
+              console.error("Failed to auto-register user. Proceeding with Firebase data.");
+              setCurrentUser({
+                id: firebaseUser.uid,
+                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+                email: firebaseUser.email || '',
+                role: UserRole.GUARDIAN
+              });
+              setViewState('DASHBOARD');
+              showNotification("Aviso: Não foi possível vincular sua conta ao banco de dados, algumas funcionalidades podem estar limitadas.", 'info');
+            }
           }
         } catch (err) {
-          console.error("Error fetching user profile:", err);
-          await signOut(auth);
-          setCurrentUser(null);
-          setViewState('LOGIN');
+          console.error("Error fetching or auto-registering user profile:", err);
+          setCurrentUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+            email: firebaseUser.email || '',
+            role: UserRole.GUARDIAN
+          });
+          setViewState('DASHBOARD');
         }
       } else {
         console.log("Auth state changed: no user logged in");
@@ -218,13 +256,24 @@ const App: React.FC = () => {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
       // onAuthStateChanged will handle the rest
     } catch (err: any) {
-      showNotification("Erro no login: " + err.message, 'error');
+      console.error("Login error:", err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        showNotification("E-mail ou senha incorretos.", 'error');
+      } else if (err.code === 'auth/too-many-requests') {
+        showNotification("Muitas tentativas malsucedidas. Tente novamente mais tarde.", 'error');
+      } else {
+        showNotification("Erro no login: " + err.message, 'error');
+      }
       setIsLoading(false);
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (signupPassword.length < 6) {
+      showNotification("A senha deve ter pelo menos 6 caracteres.", 'error');
+      return;
+    }
     setIsLoading(true);
     setIsSigningUp(true);
     try {
@@ -241,7 +290,8 @@ const App: React.FC = () => {
           firebase_uid: firebaseUser.uid,
           nome: signupName,
           email: signupEmail.trim(),
-          tipo: mapUserRoleToDbRole(signupRole)
+          tipo: mapUserRoleToDbRole(signupRole),
+          is_signup: true
         }),
       });
 
@@ -264,7 +314,12 @@ const App: React.FC = () => {
       setViewState('DASHBOARD');
     } catch (err: any) {
       console.error("Signup error:", err);
-      showNotification("Erro no cadastro: " + err.message, 'error');
+      if (err.code === 'auth/email-already-in-use') {
+        showNotification("Este e-mail já está em uso. Tente fazer login.", 'error');
+        setViewState('LOGIN');
+      } else {
+        showNotification("Erro no cadastro: " + err.message, 'error');
+      }
     } finally {
       setIsLoading(false);
       setIsSigningUp(false);
@@ -433,7 +488,7 @@ const App: React.FC = () => {
         <form onSubmit={handleSignup} className="space-y-4">
           <input required type="text" placeholder="Nome Completo" value={signupName} onChange={e => setSignupName(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
           <input required type="email" placeholder="E-mail" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
-          <input required type="password" placeholder="Senha" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
+          <input required type="password" minLength={6} placeholder="Senha (mín. 6 caracteres)" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="w-full p-4 rounded-2xl border bg-gray-50 font-bold outline-none" />
           
           <div className="space-y-2">
             <label className="text-xs font-black text-gray-400 uppercase ml-2">Tipo de Usuário</label>
@@ -498,7 +553,17 @@ const App: React.FC = () => {
             showNotification("Dados do aluno atualizados!");
           }}
           onDeleteStudent={async id => { showConfirm("Apagar este aluno?", async () => { await apiExecute("DELETE FROM alunos WHERE id = $1", [id]); fetchData(); showNotification("Aluno removido."); }); }}
-          onAddUser={async (n, e, r) => { await apiExecute("INSERT INTO usuarios (nome, email, tipo, password) VALUES ($1, $2, $3, $4)", [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123']); fetchData(); showNotification("Usuário cadastrado!"); }}
+          onAddUser={async (n, e, r) => { 
+            await apiExecute(`
+              INSERT INTO usuarios (nome, email, tipo, password) 
+              VALUES ($1, $2, $3::tipo_usuario, $4) 
+              ON CONFLICT (email) DO UPDATE SET 
+                nome = EXCLUDED.nome, 
+                tipo = EXCLUDED.tipo
+            `, [n, e.toLowerCase(), mapUserRoleToDbRole(r), '123']); 
+            fetchData(); 
+            showNotification("Usuário cadastrado!"); 
+          }}
           onDeleteUser={async id => {
             const user = users.find(u => u.id === id);
             if (!user) return;
@@ -544,7 +609,7 @@ const App: React.FC = () => {
           onLikePost={handleLikePost}
           onSendMessage={async (c, r) => { await apiExecute("INSERT INTO mensagens (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [currentUser.id, r, c]); fetchData(); }}
           onUpdateChatConfig={async (c) => { await apiExecute("UPDATE configuracao_chat SET inicio_hora = $1, fim_hora = $2, habilitado = $3", [c.startHour, c.endHour, c.isEnabled]); fetchData(); showNotification("Configuração do chat salva!"); }}
-          onApprovePlan={async (pid, f) => { await apiExecute("UPDATE planejamento_professor SET status = $1, manager_feedback = $2 WHERE id = $3", ['approved', f, pid]); fetchData(); showNotification("Planejamento aprovado!"); }}
+          onApprovePlan={async (pid: string, status: 'approved' | 'rejected', f: string) => { await apiExecute("UPDATE planejamento_professor SET status = $1, manager_feedback = $2 WHERE id = $3", [status, f, pid]); fetchData(); showNotification(`Planejamento ${status === 'approved' ? 'aprovado' : 'enviado para revisão'}!`); }}
           onSaveRoutine={handleSaveRoutine}
           routineLogs={routineLogs}
           onSaveRoutineLog={handleSaveRoutineLog}
